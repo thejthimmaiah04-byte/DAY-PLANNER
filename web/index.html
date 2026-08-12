@@ -732,6 +732,10 @@
   }
   #calSheet::-webkit-scrollbar { display: none; }
   #calSheet.open { transform: translateY(0); }
+  .cal-email-row { display:flex; align-items:center; gap:8px; background:var(--surface2); border-radius:12px; padding:9px 12px; margin-bottom:12px; border:1px solid var(--hairline); }
+  .cal-email-input { flex:1; background:none; border:none; outline:none; color:var(--ivory); font-size:13px; font-family:inherit; min-width:0; }
+  .cal-email-input::placeholder { color:var(--ivory-faint); }
+  .cal-email-sync { background:var(--gold); border:none; color:#fff; border-radius:7px; padding:3px 8px; font-size:13px; cursor:pointer; flex:none; }
   .cal-days-row { display: flex; gap: 8px; margin-top: 4px; }
   .cal-days-btn {
     flex: 1; padding: 9px 0; border: 1.5px solid var(--hairline); border-radius: 10px;
@@ -1522,11 +1526,17 @@ function renderCalendar() {
   const byDay = {};
   for (const t of tasks) if (t.due) (byDay[t.due] = byDay[t.due] || []).push(t);
 
+  const calEmail = prefs.calendarEmail || '';
   let html = `<div class="cal-head">
       <div class="screen-title">${monthName}</div>
       <button class="cal-nav" id="calPrev">‹</button>
       <button class="cal-nav" id="calNext">›</button>
       <button class="cal-nav" id="calSyncBtn" title="Sync from Google Calendar" style="font-size:16px;padding:0 6px;">⟳</button>
+    </div>
+    <div class="cal-email-row" id="calEmailRow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;opacity:.55"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
+      <input type="email" id="calEmailInline" class="cal-email-input" placeholder="Set calendar email…" value="${esc(calEmail)}" autocomplete="email">
+      ${calEmail ? `<button class="cal-email-sync" id="calEmailSyncNow" title="Sync now">⟳</button>` : ''}
     </div>
     <div class="cal-grid">
       ${['M','T','W','T','F','S','S'].map(d => `<div class="cal-dow">${d}</div>`).join('')}`;
@@ -1557,6 +1567,22 @@ function renderCalendar() {
   document.getElementById('calNext').onclick = () => { shiftMonth(1); };
   view.querySelectorAll('.cal-cell').forEach(el =>
     el.addEventListener('click', () => { selectedDate = el.dataset.date; renderCalendar(); }));
+
+  const inlineEmail = document.getElementById('calEmailInline');
+  if (inlineEmail) {
+    inlineEmail.addEventListener('change', () => {
+      prefs.calendarEmail = inlineEmail.value.trim();
+      savePrefs();
+      renderCalendar();
+    });
+    inlineEmail.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { inlineEmail.blur(); }
+    });
+  }
+  const syncNow = document.getElementById('calEmailSyncNow');
+  if (syncNow) {
+    syncNow.onclick = () => openCalSheet();
+  }
 }
 function shiftMonth(delta) {
   let [y, m] = calMonth.split('-').map(Number);
