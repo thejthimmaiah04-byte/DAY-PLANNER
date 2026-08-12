@@ -1,5 +1,6 @@
-const CACHE = 'arc-v2';
+const CACHE = 'arc-v3';
 const PRECACHE = ['./','./index.html','./manifest.json','./icon.svg',
+  './icon-192.png','./icon-512.png',
   './fonts/inter_regular.ttf','./fonts/inter_medium.ttf','./fonts/inter_semibold.ttf',
   './fonts/inter_bold.ttf','./fonts/fraunces_medium.ttf','./fonts/fraunces_semibold.ttf'];
 
