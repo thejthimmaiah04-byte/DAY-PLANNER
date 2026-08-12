@@ -979,7 +979,7 @@ function taskRowHTML(t, timeLabel, part) {
     progressHTML = `<div class="retro-bar">
       <div class="retro-segs">${segs}</div>
       <div class="retro-inline-label">
-        <span class="retro-pct">${subsPct}%</span>
+        <span class="retro-pct">${subsPct}<span style="font-size:9px;font-weight:400;opacity:0.5;letter-spacing:0;vertical-align:super;margin-left:1px">%</span></span>
         <span class="retro-label">${subsDone}/${subsTotal}</span>
       </div>
     </div>`;
@@ -1050,7 +1050,7 @@ function retroBar(pct, label) {
   return `<div class="retro-bar" style="margin-top:0">
     <div class="retro-segs" style="height:28px">${segs}</div>
     <div class="retro-inline-label">
-      <span class="retro-pct">${pct}%</span>
+      <span class="retro-pct">${pct}<span style="font-size:9px;font-weight:400;opacity:0.5;letter-spacing:0;vertical-align:super;margin-left:1px">%</span></span>
       ${label ? `<span class="retro-label">${label}</span>` : ''}
     </div>
   </div>`;
@@ -1295,7 +1295,7 @@ function renderStats() {
 
   let html = `<div class="screen-title">Progress</div>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-value">${eff}%</div><div class="stat-label">7-day efficiency</div></div>
+      <div class="stat-card"><div class="stat-value">${eff}<span style="font-size:0.5em;font-weight:400;opacity:0.5;vertical-align:super;margin-left:1px">%</span></div><div class="stat-label">7-day efficiency</div></div>
       <div class="stat-card"><div class="stat-value">${streak}</div><div class="stat-label">day streak</div></div>
       <div class="stat-card"><div class="stat-value">${doneAll.length}</div><div class="stat-label">completed all-time</div></div>
       <div class="stat-card"><div class="stat-value">${focusLabel}</div><div class="stat-label">focus this week</div></div>
