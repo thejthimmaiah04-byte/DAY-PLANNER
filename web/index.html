@@ -1253,10 +1253,6 @@ function renderToday() {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3l-4 4-4-4"/></svg>
           Meeting
         </button>
-        <button type="button" class="brief-launch" id="calSyncBtn" style="margin:0;background:var(--surface2);color:var(--ivory)">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          Calendar
-        </button>
       </div>
     </div>
     ${retroBar(pct, `${plan.completed.length} of ${total} done`)}`;
@@ -1363,6 +1359,7 @@ function renderCalendar() {
       <div class="screen-title">${monthName}</div>
       <button class="cal-nav" id="calPrev">‹</button>
       <button class="cal-nav" id="calNext">›</button>
+      <button class="cal-nav" id="calSyncBtn" title="Sync from Google Calendar" style="font-size:16px;padding:0 6px;">⟳</button>
     </div>
     <div class="cal-grid">
       ${['M','T','W','T','F','S','S'].map(d => `<div class="cal-dow">${d}</div>`).join('')}`;
