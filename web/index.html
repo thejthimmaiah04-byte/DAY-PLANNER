@@ -3424,6 +3424,134 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 
+/* ── Back-button / Hardware back (Android PWA) ───────────────────────────── */
+(function initBackNav() {
+  const ROOT = 'today';
+  let backPressedOnce = false, backExitTimer = null;
+
+  // Seed history so the very first popstate fires correctly
+  history.replaceState({ screen: screen, layer: 0 }, '', location.href);
+
+  // Push a history entry whenever the screen changes
+  function navPush(s) {
+    history.pushState({ screen: s, layer: 1 }, '', location.href);
+  }
+  function navPushModal(name) {
+    history.pushState({ modal: name, layer: 2 }, '', location.href);
+  }
+
+  // Intercept nav-bar clicks to push history
+  const origNavClick = nav.onclick;
+  nav.addEventListener('click', e => {
+    const item = e.target.closest('.nav-item');
+    if (item && item.dataset.s !== screen) navPush(item.dataset.s);
+  }, true); // capture phase — runs before the existing handler
+
+  // Intercept openEditor / openMeeting / openCalSheet / startBrief / openSearch
+  // to push a modal history entry each time a sheet opens
+  const _openEditor   = openEditor;
+  window.openEditor = function(task) {
+    navPushModal('editor'); _openEditor(task);
+  };
+  const _openMeeting  = openMeeting;
+  window.openMeeting = function() {
+    navPushModal('meeting'); _openMeeting();
+  };
+  const _openCalSheet = openCalSheet;
+  window.openCalSheet = function() {
+    navPushModal('calSheet'); _openCalSheet();
+  };
+  const _startBrief   = startBrief;
+  window.startBrief = function() {
+    navPushModal('brief'); _startBrief();
+  };
+  const _openSearch   = openSearch;
+  window.openSearch = function() {
+    navPushModal('search'); _openSearch();
+  };
+
+  // When X/overlay closes a sheet manually, pop its history entry too
+  function patchClose(closeFn, modalName) {
+    return function(...args) {
+      closeFn(...args);
+      if (history.state && history.state.modal === modalName) history.back();
+    };
+  }
+  overlay.removeEventListener('click', closeEditor);
+  const _closeEditor = closeEditor;
+  window.closeEditor = patchClose(_closeEditor, 'editor');
+  overlay.addEventListener('click', closeEditor);
+
+  window.closeMeeting = patchClose(closeMeeting, 'meeting');
+  window.closeCalSheet = patchClose(closeCalSheet, 'calSheet');
+  window.closeSearch = patchClose(closeSearch, 'search');
+  // briefEl close button is handled inline; patch it too
+  const origStopBrief = stopBrief;
+  window.stopBrief = function() {
+    origStopBrief();
+    if (history.state && history.state.modal === 'brief') history.back();
+  };
+
+  // Central popstate handler
+  window.addEventListener('popstate', async e => {
+    const s = e.state || { layer: 0 };
+
+    // ── Close open modals (highest layer first) ──────────────────────────
+    if (document.getElementById('searchOverlay').classList.contains('open')) {
+      closeSearch(); return;
+    }
+    if (sheet.classList.contains('open')) {
+      const titleEl = sheet.querySelector('#fTitle');
+      const dirty   = titleEl && titleEl.value.trim().length > 0 && !editingId;
+      if (dirty) {
+        history.pushState({ modal: 'editor', layer: 2 }, '', location.href);
+        const discard = await arcModal({
+          message: 'You have an unsaved task. Discard it?',
+          buttons: [
+            { label: 'Keep editing', type: 'secondary', value: false },
+            { label: 'Discard', type: 'danger', value: true }
+          ]
+        });
+        if (!discard) return;
+        history.back();
+      }
+      _closeEditor(); return;
+    }
+    if (document.getElementById('calSheet').classList.contains('open')) {
+      closeCalSheet(); return;
+    }
+    if (document.getElementById('meeting').classList.contains('open')) {
+      closeMeeting(); return;
+    }
+    if (briefEl.classList.contains('open')) {
+      stopBrief(); return;
+    }
+
+    // ── Screen navigation ────────────────────────────────────────────────
+    if (s.layer === 1 && s.screen && s.screen !== screen) {
+      screen = s.screen;
+      nav.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('on', el.dataset.s === screen));
+      document.getElementById('fab').style.display = screen === 'stats' ? 'none' : 'flex';
+      render();
+      return;
+    }
+
+    // ── At root (Today) — double-back to exit ────────────────────────────
+    if (backPressedOnce) {
+      // Second back within 2 s — let the browser/OS handle exit naturally
+      history.back();
+      return;
+    }
+    backPressedOnce = true;
+    showUndo('Press back again to exit', null);
+    clearTimeout(backExitTimer);
+    backExitTimer = setTimeout(() => { backPressedOnce = false; }, 2000);
+    // Re-push root so the next back triggers this handler again
+    history.pushState({ screen: ROOT, layer: 0 }, '', location.href);
+  });
+})();
+
+
 render();
 pullFromSheet();
 </script>
