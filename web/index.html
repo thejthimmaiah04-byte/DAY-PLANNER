@@ -3410,10 +3410,10 @@ document.getElementById('sheetUrlInput').addEventListener('change', e => {
     const res = await fetch('version.json?t=' + Date.now());
     const { v } = await res.json();
     const stored = localStorage.getItem('arc.version');
+    // Always store the new version first — so if user reloads, stored === v and banner won't reappear
+    localStorage.setItem('arc.version', v);
     if (stored && stored !== v) {
       document.getElementById('updateBanner').classList.add('show');
-    } else {
-      localStorage.setItem('arc.version', v);
     }
   } catch (_) {}
   setTimeout(checkVersion, 5 * 60 * 1000);
