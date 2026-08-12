@@ -695,6 +695,54 @@
   .brief-btn.ghost { background: none; border: 1px solid var(--hairline); color: var(--ivory-dim); }
   .brief-btn.ghost:hover { border-color: var(--gold-deep); color: var(--gold); }
   .brief-btn.solid { background: var(--gold); border: none; color: var(--on-gold); }
+
+  /* ---- Calendar sync modal ---- */
+  #calOverlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,.6);
+    z-index: 20; opacity: 0; pointer-events: none;
+    transition: opacity .2s;
+  }
+  #calOverlay.open { opacity: 1; pointer-events: auto; }
+  #calSheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 21;
+    background: var(--surface1); border-radius: 24px 24px 0 0;
+    padding: 12px 24px calc(24px + env(safe-area-inset-bottom));
+    transform: translateY(105%); transition: transform .25s cubic-bezier(.3,.7,.3,1);
+    max-height: 88%; overflow-y: auto; scrollbar-width: none;
+  }
+  #calSheet::-webkit-scrollbar { display: none; }
+  #calSheet.open { transform: translateY(0); }
+  .cal-days-row { display: flex; gap: 8px; margin-top: 4px; }
+  .cal-days-btn {
+    flex: 1; padding: 9px 0; border: 1.5px solid var(--hairline); border-radius: 10px;
+    background: none; color: var(--ivory-dim); font-size: 13px; cursor: pointer;
+    transition: all .15s;
+  }
+  .cal-days-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(255,85,0,.08); }
+  #calEventsList { margin-top: 14px; }
+  .cal-event-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    background: var(--surface2); border-radius: 12px;
+    padding: 11px 13px; margin-bottom: 8px; cursor: pointer;
+  }
+  .cal-event-item input[type=checkbox] { flex: none; margin-top: 2px; accent-color: var(--gold); width:17px; height:17px; }
+  .cal-event-body { flex: 1; min-width: 0; }
+  .cal-event-title { font-size: 14px; font-weight: 500; line-height: 1.3; }
+  .cal-event-meta { font-size: 12px; color: var(--ivory-dim); margin-top: 3px; }
+  .cal-event-desc { font-size: 12px; color: var(--ivory-faint); margin-top: 4px; white-space: pre-wrap; line-height: 1.4; }
+  .cal-status { text-align: center; color: var(--ivory-dim); font-size: 13px; padding: 20px 0; }
+  .cal-already { color: var(--ivory-faint); font-size: 12px; font-style: italic; margin-top: 3px; }
+  .cal-btn-row { display: flex; gap: 10px; margin-top: 16px; }
+  .cal-import-btn {
+    flex: 1; padding: 14px; border: none; border-radius: 14px;
+    background: var(--gold); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .cal-import-btn:disabled { opacity: .35; cursor: default; }
+  .cal-selall-btn {
+    padding: 14px 18px; border: 1.5px solid var(--hairline); border-radius: 14px;
+    background: none; color: var(--ivory); font-size: 14px; cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -717,6 +765,29 @@
 
   <div id="overlay"></div>
   <div id="sheet"></div>
+
+  <div id="calOverlay"></div>
+  <div id="calSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Calendar Sync</span>
+      <button class="icon-btn" id="calCloseBtn">✕</button>
+    </div>
+    <div class="field-label">Google Calendar Email</div>
+    <input type="email" id="calEmailInput" placeholder="you@gmail.com" autocomplete="email" style="margin-bottom:0">
+    <div class="field-label" style="margin-top:16px">Fetch next</div>
+    <div class="cal-days-row">
+      <button class="cal-days-btn active" data-days="7">7 days</button>
+      <button class="cal-days-btn" data-days="14">14 days</button>
+      <button class="cal-days-btn" data-days="30">30 days</button>
+    </div>
+    <button class="primary-btn" id="calFetchBtn" style="margin-top:18px">Fetch events</button>
+    <div id="calEventsList"></div>
+    <div class="cal-btn-row" id="calImportRow" style="display:none">
+      <button class="cal-selall-btn" id="calSelAllBtn">Select all</button>
+      <button class="cal-import-btn" id="calImportBtn">Import selected</button>
+    </div>
+  </div>
 
   <div id="meeting">
     <div class="meeting-head">
@@ -798,14 +869,53 @@ function pruneOldCompletedRepeats() {
 }
 pruneOldCompletedRepeats();
 
-const save = () => localStorage.setItem('meridian.tasks', JSON.stringify(tasks));
+// ── Google Sheets sync ──────────────────────────────────────────────────────
+// After deploying apps-script.gs, paste your web app URL here:
+const SHEET_URL = '';
+
+function pushToSheet() {
+  if (!SHEET_URL) return;
+  const payload = JSON.stringify({
+    tasks, vision, research, prefs: typeof prefs !== 'undefined' ? prefs : {},
+    archive: JSON.parse(localStorage.getItem('arc.archive') || '[]'),
+    syncedAt: new Date().toISOString()
+  });
+  fetch(SHEET_URL, { method: 'POST', mode: 'no-cors', body: payload }).catch(() => {});
+}
+
+async function pullFromSheet() {
+  if (!SHEET_URL) return;
+  try {
+    const res = await fetch(SHEET_URL + '?t=' + Date.now());
+    const d = await res.json();
+    let changed = false;
+    if (Array.isArray(d.tasks) && d.tasks.length) {
+      tasks = d.tasks; localStorage.setItem('meridian.tasks', JSON.stringify(tasks)); changed = true;
+    }
+    if (d.vision && Object.keys(d.vision).length) {
+      vision = Object.assign({ statement: '', target: '', milestones: [] }, d.vision);
+      localStorage.setItem('meridian.vision', JSON.stringify(vision)); changed = true;
+    }
+    if (Array.isArray(d.research)) {
+      research = d.research; localStorage.setItem('arc.research', JSON.stringify(research)); changed = true;
+    }
+    if (d.prefs && typeof prefs !== 'undefined') {
+      Object.assign(prefs, d.prefs); localStorage.setItem('meridian.prefs', JSON.stringify(prefs));
+    }
+    if (d.archive) localStorage.setItem('arc.archive', JSON.stringify(d.archive));
+    if (changed) render();
+  } catch (_) {}
+}
+// ────────────────────────────────────────────────────────────────────────────
+
+const save = () => { localStorage.setItem('meridian.tasks', JSON.stringify(tasks)); pushToSheet(); };
 
 let vision = Object.assign({ statement: '', target: '', milestones: [] },
   JSON.parse(localStorage.getItem('meridian.vision') || '{}'));
-const saveVision = () => localStorage.setItem('meridian.vision', JSON.stringify(vision));
+const saveVision = () => { localStorage.setItem('meridian.vision', JSON.stringify(vision)); pushToSheet(); };
 
 let research = JSON.parse(localStorage.getItem('arc.research') || '[]');
-const saveResearch = () => localStorage.setItem('arc.research', JSON.stringify(research));
+const saveResearch = () => { localStorage.setItem('arc.research', JSON.stringify(research)); pushToSheet(); };
 let expandedProjectId = null;
 let meetingMode = 'work';
 let meetingFeedbackId = null;
@@ -1123,6 +1233,10 @@ function renderToday() {
         <button type="button" class="brief-launch" id="meetingBtn" style="margin:0;background:var(--surface2);color:var(--ivory)">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3l-4 4-4-4"/></svg>
           Meeting
+        </button>
+        <button type="button" class="brief-launch" id="calSyncBtn" style="margin:0;background:var(--surface2);color:var(--ivory)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          Calendar
         </button>
       </div>
     </div>
@@ -1754,7 +1868,7 @@ overlay.addEventListener('click', closeEditor);
 /* ================= Morning brief ================= */
 const prefs = Object.assign({ weather: true, news: true, voiceName: '', rate: 0.95 },
   JSON.parse(localStorage.getItem('meridian.prefs') || '{}'));
-const savePrefs = () => localStorage.setItem('meridian.prefs', JSON.stringify(prefs));
+const savePrefs = () => { localStorage.setItem('meridian.prefs', JSON.stringify(prefs)); pushToSheet(); };
 
 const briefEl = document.getElementById('brief');
 const briefSection = document.getElementById('briefSection');
@@ -2768,7 +2882,155 @@ function eveningNudge() {
 setInterval(eveningNudge, 30000);
 eveningNudge();
 
+/* ================= Calendar Sync ================= */
+let calFetchedEvents = [];
+let calDays = 7;
+const calImported = new Set(JSON.parse(localStorage.getItem('arc.calImported') || '[]'));
+
+const calOverlay  = document.getElementById('calOverlay');
+const calSheet    = document.getElementById('calSheet');
+const calClose    = document.getElementById('calCloseBtn');
+const calFetchBtn = document.getElementById('calFetchBtn');
+const calImportRow= document.getElementById('calImportRow');
+const calImportBtn= document.getElementById('calImportBtn');
+const calSelAllBtn= document.getElementById('calSelAllBtn');
+const calEmailIn  = document.getElementById('calEmailInput');
+const calList     = document.getElementById('calEventsList');
+
+function openCalSheet() {
+  calEmailIn.value = prefs.calendarEmail || '';
+  calList.innerHTML = '';
+  calImportRow.style.display = 'none';
+  calFetchedEvents = [];
+  calOverlay.classList.add('open');
+  calSheet.classList.add('open');
+}
+function closeCalSheet() {
+  calOverlay.classList.remove('open');
+  calSheet.classList.remove('open');
+}
+
+calOverlay.addEventListener('click', closeCalSheet);
+calClose.addEventListener('click', closeCalSheet);
+
+document.querySelectorAll('.cal-days-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cal-days-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    calDays = parseInt(btn.dataset.days);
+  });
+});
+
+calFetchBtn.addEventListener('click', async () => {
+  const email = calEmailIn.value.trim();
+  if (!email) { calList.innerHTML = '<div class="cal-status">Enter a calendar email first.</div>'; return; }
+  if (!SHEET_URL) { calList.innerHTML = '<div class="cal-status">Set up SHEET_URL first (see setup instructions).</div>'; return; }
+  prefs.calendarEmail = email;
+  savePrefs();
+  calFetchBtn.disabled = true;
+  calFetchBtn.textContent = 'Fetching…';
+  calList.innerHTML = '<div class="cal-status">Loading events…</div>';
+  calImportRow.style.display = 'none';
+  try {
+    const url = `${SHEET_URL}?action=calendar&email=${encodeURIComponent(email)}&days=${calDays}&t=${Date.now()}`;
+    const res = await fetch(url);
+    const d = await res.json();
+    if (d.error) { calList.innerHTML = `<div class="cal-status" style="color:var(--terracotta)">${esc(d.error)}</div>`; return; }
+    calFetchedEvents = d.events || [];
+    renderCalEvents();
+  } catch (e) {
+    calList.innerHTML = '<div class="cal-status" style="color:var(--terracotta)">Failed to fetch. Check your SHEET_URL and network.</div>';
+  } finally {
+    calFetchBtn.disabled = false;
+    calFetchBtn.textContent = 'Fetch events';
+  }
+});
+
+function renderCalEvents() {
+  if (!calFetchedEvents.length) {
+    calList.innerHTML = '<div class="cal-status">No upcoming events found.</div>';
+    calImportRow.style.display = 'none';
+    return;
+  }
+  let html = '';
+  calFetchedEvents.forEach((ev, i) => {
+    const already = calImported.has(ev.id);
+    const start = new Date(ev.start);
+    const end   = new Date(ev.end);
+    const dateStr = start.toLocaleDateString('en-IN', { weekday:'short', month:'short', day:'numeric' });
+    const timeStr = ev.allDay ? 'All day' : (
+      start.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) +
+      ' – ' + end.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' })
+    );
+    const desc = ev.description ? `<div class="cal-event-desc">${esc(ev.description.slice(0,120))}${ev.description.length>120?'…':''}</div>` : '';
+    const loc  = ev.location ? `<span>📍 ${esc(ev.location)}</span>` : '';
+    html += `<label class="cal-event-item">
+      <input type="checkbox" data-idx="${i}"${already ? ' disabled' : ' checked'}>
+      <div class="cal-event-body">
+        <div class="cal-event-title">${esc(ev.title)}</div>
+        <div class="cal-event-meta">${dateStr} · ${timeStr} ${loc}</div>
+        ${already ? '<div class="cal-already">Already imported</div>' : desc}
+      </div>
+    </label>`;
+  });
+  calList.innerHTML = html;
+  calImportRow.style.display = 'flex';
+  updateImportBtn();
+  calList.querySelectorAll('input[type=checkbox]').forEach(cb => cb.addEventListener('change', updateImportBtn));
+}
+
+function updateImportBtn() {
+  const n = calList.querySelectorAll('input[type=checkbox]:not(:disabled):checked').length;
+  calImportBtn.textContent = n ? `Import ${n} event${n>1?'s':''}` : 'Import selected';
+  calImportBtn.disabled = n === 0;
+}
+
+calSelAllBtn.addEventListener('click', () => {
+  const boxes = calList.querySelectorAll('input[type=checkbox]:not(:disabled)');
+  const allChecked = [...boxes].every(b => b.checked);
+  boxes.forEach(b => b.checked = !allChecked);
+  updateImportBtn();
+});
+
+calImportBtn.addEventListener('click', () => {
+  const newTasks = [];
+  calList.querySelectorAll('input[type=checkbox]:not(:disabled):checked').forEach(cb => {
+    const ev = calFetchedEvents[parseInt(cb.dataset.idx)];
+    if (!ev) return;
+    const start = new Date(ev.start);
+    const dueDate = toDateStr(start);
+    let timeVal = null;
+    if (!ev.allDay) {
+      const h = start.getHours(), m = start.getMinutes();
+      timeVal = fmtTime(h, m);
+    }
+    const end = new Date(ev.end);
+    const durMin = Math.round((end - start) / 60000);
+    newTasks.push({
+      id: uid(), title: ev.title, category: 'WORK', priority: 'medium',
+      due: dueDate, time: timeVal,
+      duration: (!ev.allDay && durMin > 0 && durMin < 480) ? durMin : 60,
+      notes: [ev.description, ev.location ? `Location: ${ev.location}` : ''].filter(Boolean).join('\n').trim(),
+      done: false, repeat: null, inProgress: false, meetingNote: '',
+      calendarEventId: ev.id
+    });
+    calImported.add(ev.id);
+  });
+  if (!newTasks.length) return;
+  tasks.push(...newTasks);
+  localStorage.setItem('arc.calImported', JSON.stringify([...calImported]));
+  save();
+  render();
+  closeCalSheet();
+  showUndo(`${newTasks.length} calendar event${newTasks.length>1?'s':''} added`, null);
+});
+
+document.addEventListener('click', e => {
+  if (e.target.id === 'calSyncBtn') openCalSheet();
+});
+
 render();
+pullFromSheet();
 </script>
 </body>
 </html>

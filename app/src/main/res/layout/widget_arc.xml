@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical">
+    <!-- Both halves centered on the same horizontal axis so the clock and the
+         task list line up as one card; the ink background fills any letterbox. -->
+    <ImageView
+        android:id="@+id/widget_clock_image"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/app_name" />
+    <ImageView
+        android:id="@+id/widget_tasks_image"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/app_name" />
+</LinearLayout>
