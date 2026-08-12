@@ -205,8 +205,8 @@ private fun WorkTab(
             workSection("Being worked on", Champagne, inProgress, onToggle, onEdit, null)
             workSection("Pending", Slate, pending, onToggle, onEdit,
                 "No pending tasks.")
-            workSection("Tasks done", Sage, completed, onToggle, onEdit,
-                "Nothing completed in the last 7 days.", struck = true)
+            workSection("Completed tasks", Sage, completed, onToggle, onEdit,
+                "Nothing completed in the last 7 days.", struck = false)
 
             item { Spacer(Modifier.height(8.dp)) }
         }

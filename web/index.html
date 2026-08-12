@@ -100,11 +100,8 @@
   .pdot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
   .task-time { font-size: 13px; font-weight: 600; color: var(--gold); white-space: nowrap; }
 
-  /* ---- Progress bar ---- */
-  .progress-wrap { display: flex; align-items: center; gap: 12px; }
+  /* ---- Progress bar text ---- */
   .progress-text { font-size: 13px; color: var(--ivory-dim); white-space: nowrap; }
-  .progress-track { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
-  .progress-fill  { height: 100%; background: var(--gold); border-radius: 3px; transition: width .4s; }
 
   /* ---- Chips ---- */
   .chip-row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
@@ -482,7 +479,7 @@
   .meeting-task:hover { background: var(--surface2); }
   .meeting-task-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .meeting-task-title { font-size: 15px; flex: 1; line-height: 1.35; }
-  .meeting-task.done .meeting-task-title { color: var(--ivory-faint); text-decoration: line-through; }
+  .meeting-task.done .meeting-task-title { color: var(--ivory-dim); }
   .meeting-task-edit {
     background: none; border: none; color: var(--ivory-faint);
     font-size: 15px; cursor: pointer; padding: 2px 4px; flex: none;
@@ -1045,6 +1042,19 @@ function emptyHTML(title, sub) {
   return `<div class="empty"><div class="empty-orb"></div><h3>${title}</h3><p>${sub}</p></div>`;
 }
 
+function retroBar(pct, label) {
+  const SEGS = 28;
+  const filled = Math.round(pct / 100 * SEGS);
+  const segs = Array.from({length: SEGS}, (_, i) =>
+    `<div class="retro-seg${i < filled ? ' on' : ''}"></div>`).join('');
+  return `<div class="retro-bar" style="margin-top:0">
+    <div class="retro-segs" style="height:28px">${segs}</div>
+    <div class="retro-inline-label">
+      <span class="retro-pct">${pct}%</span>
+      ${label ? `<span class="retro-label">${label}</span>` : ''}
+    </div>
+  </div>`;
+}
 
 /* ---- Today ---- */
 function renderToday() {
@@ -1091,10 +1101,7 @@ function renderToday() {
         </button>
       </div>
     </div>
-    <div class="progress-wrap" style="margin-top:10px">
-      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <div class="progress-text">${plan.completed.length} of ${total} done</div>
-    </div>`;
+    ${retroBar(pct, `${plan.completed.length} of ${total} done`)}`;
 
   if (plan.triage.length) {
     html += `<div class="triage">
@@ -1436,8 +1443,7 @@ function renderVision() {
 
     <div class="section-label">Overall progress</div>
     <div class="progress-wrap" style="margin-top:6px">
-      <div class="progress-track"><div class="progress-fill" style="width:${Math.round(overall*100)}%"></div></div>
-      <div class="progress-text">${Math.round(overall*100)}%</div>
+      ${retroBar(Math.round(overall*100), '')}
     </div>
 
     <div class="section-label">Milestones</div>
@@ -1965,7 +1971,7 @@ function renderMeeting() {
     let html = '';
     if (inProgress.length) { html += `<div class="meeting-group-label">Being worked on · ${inProgress.length}</div>${inProgress.map(workTaskRow).join('')}`; }
     if (pending.length)    { html += `<div class="meeting-group-label">Pending · ${pending.length}</div>${pending.map(workTaskRow).join('')}`; }
-    if (done.length)       { html += `<div class="meeting-group-label">Tasks done · ${done.length}</div>${done.map(workTaskRow).join('')}`; }
+    if (done.length)       { html += `<div class="meeting-group-label">Completed tasks · ${done.length}</div>${done.map(workTaskRow).join('')}`; }
     if (!workTasks.length) html = `<div style="padding:30px 0 0;text-align:center;color:var(--ivory-faint);font-size:15px">No Work tasks yet</div>`;
     html += `<div class="mt-add-row">
       <input class="mt-add-input" id="mtAddWork" placeholder="Add a Work task…">
