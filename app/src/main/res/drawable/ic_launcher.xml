@@ -4,13 +4,13 @@
     android:height="108dp"
     android:viewportWidth="64"
     android:viewportHeight="64">
-    <!-- ink ground -->
+    <!-- orange tile background -->
     <path
-        android:fillColor="#050505"
+        android:fillColor="#FF5500"
         android:pathData="M0,0h64v64h-64z" />
     <!-- horizon -->
     <path
-        android:strokeColor="#FF5500"
+        android:strokeColor="#0A0A0A"
         android:strokeWidth="2.4"
         android:strokeAlpha="0.9"
         android:strokeLineCap="round"
@@ -18,7 +18,7 @@
         android:pathData="M10,42 L54,42" />
     <!-- outer arc (softest) -->
     <path
-        android:strokeColor="#FF5500"
+        android:strokeColor="#0A0A0A"
         android:strokeWidth="3.4"
         android:strokeAlpha="0.45"
         android:strokeLineCap="round"
@@ -26,7 +26,7 @@
         android:pathData="M9,42 A23,23 0 0 1 55,42" />
     <!-- middle arc -->
     <path
-        android:strokeColor="#FF5500"
+        android:strokeColor="#0A0A0A"
         android:strokeWidth="3.6"
         android:strokeAlpha="0.72"
         android:strokeLineCap="round"
@@ -34,13 +34,13 @@
         android:pathData="M16,42 A16,16 0 0 1 48,42" />
     <!-- inner arc (brightest) -->
     <path
-        android:strokeColor="#FF5500"
+        android:strokeColor="#0A0A0A"
         android:strokeWidth="3.8"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
         android:pathData="M23,42 A9,9 0 0 1 41,42" />
     <!-- sun core -->
     <path
-        android:fillColor="#FF5500"
+        android:fillColor="#0A0A0A"
         android:pathData="M32,42 m-3.1,0 a3.1,3.1 0 1,0 6.2,0 a3.1,3.1 0 1,0 -6.2,0" />
 </vector>

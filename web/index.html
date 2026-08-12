@@ -472,9 +472,9 @@
     text-transform: uppercase; color: var(--ivory-faint); margin: 22px 0 10px;
   }
   .meeting-task {
-    display: flex; align-items: center; gap: 12px;
+    display: flex; flex-direction: column;
     background: var(--surface1); border-radius: 14px;
-    padding: 14px 16px; margin-bottom: 8px; cursor: pointer;
+    padding: 14px 16px; margin-bottom: 8px;
   }
   .meeting-task:hover { background: var(--surface2); }
   .meeting-task-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
@@ -501,6 +501,30 @@
     font-size: 13px; color: var(--ivory-faint);
   }
   .mt-del-btn { color: var(--terracotta); }
+  .mt-fb-btn {
+    background: none; border: none; cursor: pointer; padding: 2px 4px; flex: none;
+    font-size: 13px; color: var(--ivory-faint); opacity: 0.7;
+  }
+  .mt-fb-btn.has-note { color: var(--gold); opacity: 1; }
+  .mt-feedback-area {
+    margin: 10px 0 4px 0; display: flex; flex-direction: column; gap: 6px;
+  }
+  .mt-feedback-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--gold);
+    border-radius: 10px; padding: 10px 12px; color: var(--ivory); font-size: 13px;
+    font-family: inherit; resize: none; min-height: 44px; outline: none;
+    box-sizing: border-box; line-height: 1.5; overflow: hidden;
+    field-sizing: content;
+  }
+  .mt-feedback-existing {
+    margin: 6px 0 0 0; font-size: 12px; color: var(--ivory-faint);
+    font-style: italic; line-height: 1.5; padding: 0 2px;
+  }
+  .mt-feedback-save {
+    align-self: flex-end; padding: 6px 18px; background: var(--gold);
+    color: #fff; border: none; border-radius: 8px; font-size: 12px;
+    font-weight: 600; cursor: pointer; letter-spacing: .3px;
+  }
   .mt-subs { margin: 8px 0 4px 30px; border-left: 1px solid var(--hairline); padding-left: 10px; }
   .mt-sub-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--hairline); }
   .mt-sub-row:last-child { border-bottom: none; }
@@ -784,6 +808,7 @@ let research = JSON.parse(localStorage.getItem('arc.research') || '[]');
 const saveResearch = () => localStorage.setItem('arc.research', JSON.stringify(research));
 let expandedProjectId = null;
 let meetingMode = 'work';
+let meetingFeedbackId = null;
 
 const milestoneProgress = ms => {
   const linked = tasks.filter(t => t.milestoneId === ms.id);
@@ -1939,9 +1964,12 @@ function renderMeeting() {
 
     function workTaskRow(t) {
       const isExp = meetingExpandedId === t.id;
+      const isFb  = meetingFeedbackId === t.id;
       const subsDone = (t.subs||[]).filter(s=>s.done).length;
       const subsTotal = (t.subs||[]).length;
       const subCount = subsTotal ? `<span class="mt-sub-count">${subsDone}/${subsTotal}</span>` : '';
+      const hasFeedback = !!(t.meetingNote && t.meetingNote.trim());
+
       let subsHTML = '';
       if (isExp) {
         const rows = (t.subs||[]).map((s,i) => `
@@ -1956,15 +1984,26 @@ function renderMeeting() {
           </div>
         </div>`;
       }
+
+      const feedbackHTML = isFb
+        ? `<div class="mt-feedback-area">
+            <textarea class="mt-feedback-input" id="fbInput_${t.id}" placeholder="Add feedback — what went well, what blocked you, next steps…">${esc(t.meetingNote||'')}</textarea>
+            <button class="mt-feedback-save" data-mtfeedbacksave="${t.id}">Save</button>
+          </div>`
+        : hasFeedback
+          ? `<div class="mt-feedback-existing">💬 ${esc(t.meetingNote)}</div>`
+          : '';
+
       return `<div class="meeting-task${t.done?' done':''}">
         <div class="mt-row-head">
           <div class="mt-check${t.done?' done':''}" data-mttoggle="${t.id}">✓</div>
           <span class="meeting-task-title">${esc(t.title)}${subCount}</span>
+          <button class="mt-fb-btn${hasFeedback?' has-note':''}" data-mtfb="${t.id}" title="Feedback">💬</button>
           <button class="mt-exp-btn" data-mtexp="${t.id}">${isExp?'▴':'▾'}</button>
           <button class="meeting-task-edit" data-edit="${t.id}">✎</button>
           <button class="mt-del-btn" data-mtdel="${t.id}">✕</button>
         </div>
-        ${subsHTML}
+        ${subsHTML}${feedbackHTML}
       </div>`;
     }
 
@@ -1985,6 +2024,13 @@ function renderMeeting() {
     });
     const workInp = body.querySelector('#mtAddWork');
     if (workInp) workInp.addEventListener('keydown', ev => { if (ev.key === 'Enter') mtAddWorkTask(workInp); });
+
+    // Auto-expand feedback textareas (fallback for browsers without field-sizing:content)
+    body.querySelectorAll('.mt-feedback-input').forEach(ta => {
+      const resize = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+      ta.addEventListener('input', resize);
+      resize();
+    });
 
   } else {
     let html = '';
@@ -2373,6 +2419,31 @@ document.getElementById('meeting').addEventListener('click', e => {
   const mtExp = e.target.closest('[data-mtexp]');
   if (mtExp) {
     meetingExpandedId = meetingExpandedId === mtExp.dataset.mtexp ? null : mtExp.dataset.mtexp;
+    renderMeeting(); return;
+  }
+
+  // Toggle feedback panel
+  const mtFb = e.target.closest('[data-mtfb]');
+  if (mtFb) {
+    meetingFeedbackId = meetingFeedbackId === mtFb.dataset.mtfb ? null : mtFb.dataset.mtfb;
+    renderMeeting();
+    if (meetingFeedbackId) {
+      const inp = document.getElementById('fbInput_' + meetingFeedbackId);
+      if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+    }
+    return;
+  }
+
+  // Save feedback
+  const mtFbSave = e.target.closest('[data-mtfeedbacksave]');
+  if (mtFbSave) {
+    const t = tasks.find(x => x.id === mtFbSave.dataset.mtfeedbacksave);
+    if (t) {
+      const inp = document.getElementById('fbInput_' + t.id);
+      t.meetingNote = inp ? inp.value.trim() : '';
+      save();
+    }
+    meetingFeedbackId = null;
     renderMeeting(); return;
   }
 

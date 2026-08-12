@@ -394,6 +394,7 @@ private fun ArcApp(
                     onAddWorkTask = viewModel::addMeetingWorkTask,
                     onToggleResearchTask = viewModel::toggleResearchTask,
                     onAddResearchTask = viewModel::addResearchTask,
+                    onSaveFeedback = viewModel::saveMeetingFeedback,
                     onClose = { showMeeting = false }
                 )
             }

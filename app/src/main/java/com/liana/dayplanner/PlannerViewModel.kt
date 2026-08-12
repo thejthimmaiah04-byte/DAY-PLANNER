@@ -128,6 +128,10 @@ class PlannerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun saveMeetingFeedback(task: Task, note: String) {
+        viewModelScope.launch { dao.upsert(task.copy(meetingNote = note)) }
+    }
+
     fun save(task: Task) {
         viewModelScope.launch {
             val withSeries =

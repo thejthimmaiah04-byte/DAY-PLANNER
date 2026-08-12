@@ -81,6 +81,7 @@ fun MeetingScreen(
     onAddWorkTask: (String) -> Unit,
     onToggleResearchTask: (projId: String, itemId: String) -> Unit,
     onAddResearchTask: (projId: String, text: String) -> Unit,
+    onSaveFeedback: (Task, String) -> Unit,
     onClose: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -140,7 +141,7 @@ fun MeetingScreen(
             }
 
             if (selectedTab == 0) {
-                WorkTab(tasks = tasks, onToggle = onToggle, onEdit = onEdit, onAddTask = onAddWorkTask)
+                WorkTab(tasks = tasks, onToggle = onToggle, onEdit = onEdit, onAddTask = onAddWorkTask, onSaveFeedback = onSaveFeedback)
             } else {
                 ResearchTab(
                     projects = researchProjects,
@@ -157,7 +158,8 @@ private fun WorkTab(
     tasks: List<Task>,
     onToggle: (Task) -> Unit,
     onEdit: (Task) -> Unit,
-    onAddTask: (String) -> Unit
+    onAddTask: (String) -> Unit,
+    onSaveFeedback: (Task, String) -> Unit
 ) {
     val cutoffMillis = System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000
     val relevant = tasks.filter {
@@ -202,11 +204,10 @@ private fun WorkTab(
                 }
             }
 
-            workSection("Being worked on", Champagne, inProgress, onToggle, onEdit, null)
-            workSection("Pending", Slate, pending, onToggle, onEdit,
-                "No pending tasks.")
+            workSection("Being worked on", Champagne, inProgress, onToggle, onEdit, null, onSaveFeedback)
+            workSection("Pending", Slate, pending, onToggle, onEdit, "No pending tasks.", onSaveFeedback)
             workSection("Completed tasks", Sage, completed, onToggle, onEdit,
-                "Nothing completed in the last 7 days.", struck = false)
+                "Nothing completed in the last 7 days.", onSaveFeedback, struck = false)
 
             item { Spacer(Modifier.height(8.dp)) }
         }
@@ -261,6 +262,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.workSection(
     onToggle: (Task) -> Unit,
     onEdit: (Task) -> Unit,
     emptyText: String?,
+    onSaveFeedback: (Task, String) -> Unit,
     struck: Boolean = false
 ) {
     if (tasks.isEmpty() && emptyText == null) return
@@ -283,82 +285,113 @@ private fun androidx.compose.foundation.lazy.LazyListScope.workSection(
         }
     } else {
         items(tasks, key = { it.id }) { t ->
-            MeetingTaskRow(task = t, struck = struck, onToggle = { onToggle(t) }, onEdit = { onEdit(t) })
+            MeetingTaskRow(task = t, struck = struck, onToggle = { onToggle(t) }, onEdit = { onEdit(t) }, onSaveFeedback = { note -> onSaveFeedback(t, note) })
         }
     }
 }
 
 @Composable
-private fun MeetingTaskRow(task: Task, struck: Boolean, onToggle: () -> Unit, onEdit: () -> Unit) {
+private fun MeetingTaskRow(task: Task, struck: Boolean, onToggle: () -> Unit, onEdit: () -> Unit, onSaveFeedback: (String) -> Unit) {
+    var feedbackOpen by remember(task.id) { mutableStateOf(false) }
+    var feedbackText by remember(task.id) { mutableStateOf(task.meetingNote) }
     Surface(
         color = Surface1,
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Check circle
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .background(
-                        if (task.isDone) Sage else androidx.compose.ui.graphics.Color.Transparent,
-                        CircleShape
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 11.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Check circle
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(
+                            if (task.isDone) Sage else androidx.compose.ui.graphics.Color.Transparent,
+                            CircleShape
+                        )
+                        .clickable(onClick = onToggle),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!task.isDone) {
+                        Surface(
+                            modifier = Modifier.size(22.dp),
+                            color = androidx.compose.ui.graphics.Color.Transparent,
+                            shape = CircleShape,
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, Hairline)
+                        ) {}
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        task.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (struck) IvoryDim else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    .then(
-                        if (!task.isDone)
-                            Modifier.background(androidx.compose.ui.graphics.Color.Transparent, CircleShape)
-                        else Modifier
+                    if (task.meetingNote.isBlank()) {
+                        val contextNote = when {
+                            task.isDone && task.outcome.isNotBlank() -> task.outcome
+                            task.pendingReason.isNotBlank() -> task.pendingReason
+                            task.notes.isNotBlank() -> task.notes
+                            else -> ""
+                        }
+                        if (contextNote.isNotBlank()) {
+                            Spacer(Modifier.height(3.dp))
+                            Text(contextNote, style = MaterialTheme.typography.bodyMedium, color = IvoryFaint,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis, fontStyle = FontStyle.Italic)
+                        }
+                    }
+                }
+                IconButton(
+                    onClick = { feedbackOpen = !feedbackOpen },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Outlined.Edit,
+                        "Feedback",
+                        tint = if (task.meetingNote.isNotBlank()) Champagne else IvoryFaint,
+                        modifier = Modifier.size(16.dp)
                     )
-                    .clickable(onClick = onToggle),
-                contentAlignment = Alignment.Center
-            ) {
-                if (!task.isDone) {
-                    Box(
-                        Modifier
-                            .size(22.dp)
-                            .background(androidx.compose.ui.graphics.Color.Transparent, CircleShape)
-                            .then(Modifier.background(androidx.compose.ui.graphics.Color.Transparent, CircleShape))
-                    )
-                    // Draw border ring
-                    Surface(
-                        modifier = Modifier.size(22.dp),
-                        color = androidx.compose.ui.graphics.Color.Transparent,
-                        shape = CircleShape,
-                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Hairline)
-                    ) {}
                 }
             }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
+
+            // Existing meeting note (collapsed)
+            if (task.meetingNote.isNotBlank() && !feedbackOpen) {
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    task.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (struck) IvoryDim else MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (struck) TextDecoration.LineThrough else null,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    "💬 ${task.meetingNote}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = IvoryFaint,
+                    fontStyle = FontStyle.Italic
                 )
-                if (task.notes.isNotBlank() || task.pendingReason.isNotBlank() || task.outcome.isNotBlank()) {
-                    val note = when {
-                        task.isDone && task.outcome.isNotBlank() -> task.outcome
-                        task.pendingReason.isNotBlank() -> task.pendingReason
-                        task.notes.isNotBlank() -> task.notes
-                        else -> ""
-                    }
-                    if (note.isNotBlank()) {
-                        Spacer(Modifier.height(3.dp))
-                        Text(note, style = MaterialTheme.typography.bodyMedium, color = IvoryFaint,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis,
-                            fontStyle = FontStyle.Italic)
-                    }
-                }
             }
-            Spacer(Modifier.width(8.dp))
-            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Outlined.Edit, "Edit", tint = IvoryFaint, modifier = Modifier.size(16.dp))
+
+            // Feedback input (expanded)
+            if (feedbackOpen) {
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = feedbackText,
+                    onValueChange = { feedbackText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("What went well, what blocked you, next steps…", color = IvoryFaint) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Champagne,
+                        unfocusedBorderColor = Hairline,
+                        cursorColor = Champagne
+                    ),
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    minLines = 2,
+                    maxLines = 8
+                )
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.TextButton(
+                    onClick = { onSaveFeedback(feedbackText); feedbackOpen = false },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Save", color = Champagne, style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
