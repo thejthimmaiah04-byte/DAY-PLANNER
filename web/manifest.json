@@ -1,0 +1,13 @@
+{
+  "name": "ARC — Day Planner",
+  "short_name": "ARC",
+  "description": "Personal day planner with 2-year vision tracking",
+  "start_url": "/DAY-PLANNER/web/",
+  "scope": "/DAY-PLANNER/web/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#FF5500",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

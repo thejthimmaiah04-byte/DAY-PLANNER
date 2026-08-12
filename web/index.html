@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ARC — Day Planner</title>
 <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="%230B0C10"/><path d="M15 41 A17 17 0 0 1 49 41" fill="none" stroke="%23D4B476" stroke-width="4.5" stroke-linecap="round"/><circle cx="32" cy="23" r="4" fill="%23D4B476"/><line x1="13" y1="48" x2="51" y2="48" stroke="%23504734" stroke-width="3" stroke-linecap="round"/></svg>'>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#FF5500">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ARC">
+<link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@100;200;300;400;500;600&display=swap" rel="stylesheet">
@@ -424,7 +430,7 @@
     background: var(--surface2); border: 1px solid var(--hairline);
     border-radius: 18px; padding: 24px 20px 18px; width: calc(100% - 48px); max-width: 340px;
   }
-  #arcModalMsg { font-size: 15px; font-weight: 600; margin-bottom: 14px; line-height: 1.4; }
+  #arcModalMsg { font-size: 15px; font-weight: 600; margin-bottom: 14px; line-height: 1.4; white-space: pre-line; }
   #arcModalInput {
     width: 100%; background: var(--ink); border: 1px solid var(--hairline);
     border-radius: 10px; color: var(--ivory); font-size: 15px; padding: 11px 13px;
@@ -757,10 +763,58 @@
     padding: 14px 18px; border: 1.5px solid var(--hairline); border-radius: 14px;
     background: none; color: var(--ivory); font-size: 14px; cursor: pointer;
   }
+
+  /* ---- Sync status dot ---- */
+  .sync-dot { width:8px; height:8px; border-radius:50%; background:var(--ivory-faint); position:absolute; top:14px; right:20px; z-index:5; transition:background .3s; }
+  .sync-dot.syncing { background:var(--gold); animation:sync-pulse 1s infinite; }
+  .sync-dot.ok { background:var(--sage); }
+  .sync-dot.error { background:var(--terracotta); }
+  @keyframes sync-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ---- Search overlay ---- */
+  .search-overlay { display:none; position:absolute; inset:0; z-index:30; background:var(--ink); flex-direction:column; padding:16px 20px; }
+  .search-overlay.open { display:flex; }
+  .search-top { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .search-input { flex:1; background:var(--surface2); border:1px solid var(--hairline); border-radius:12px; color:var(--ivory); font-size:15px; padding:12px 14px; outline:none; font-family:inherit; }
+  .search-input:focus { border-color:var(--gold); }
+  .search-cancel { background:none; border:none; color:var(--gold); font-size:14px; cursor:pointer; padding:8px 0; white-space:nowrap; font-family:inherit; }
+  .search-results { flex:1; overflow-y:auto; scrollbar-width:none; }
+  .search-results::-webkit-scrollbar { display:none; }
+
+  /* ---- Quick reschedule menu ---- */
+  .quick-sched { display:none; position:fixed; z-index:25; background:var(--surface2); border:1px solid var(--hairline); border-radius:14px; padding:6px; flex-direction:column; gap:4px; box-shadow:0 8px 32px rgba(0,0,0,.5); min-width:160px; }
+  .qs-btn { background:none; border:none; color:var(--ivory); font-size:14px; padding:10px 14px; border-radius:10px; cursor:pointer; text-align:left; font-family:inherit; }
+  .qs-btn:hover { background:var(--surface1); }
+  .qs-btn.danger { color:var(--terracotta); }
+
+  /* ---- Focus timer ---- */
+  .focus-bar { display:flex; align-items:center; gap:10px; background:var(--surface2); border-radius:14px; padding:12px 16px; margin-bottom:10px; border-left:3px solid var(--gold); }
+  .focus-task-title { flex:1; font-size:14px; font-weight:500; }
+  .focus-time { font-size:22px; font-weight:700; color:var(--gold); letter-spacing:-0.5px; font-variant-numeric:tabular-nums; }
+  .focus-stop { background:none; border:1px solid var(--hairline); border-radius:8px; color:var(--ivory-dim); font-size:12px; padding:5px 10px; cursor:pointer; font-family:inherit; }
+  .task-start-btn { background:none; border:1px solid var(--hairline); border-radius:7px; color:var(--ivory-dim); font-size:11px; padding:3px 8px; cursor:pointer; margin-left:auto; flex:none; font-family:inherit; }
+  .task-start-btn.active { border-color:var(--gold); color:var(--gold); }
 </style>
 </head>
 <body>
 <div id="phone">
+  <div class="sync-dot" id="syncDot" title="Sync status"></div>
+
+  <div class="search-overlay" id="searchOverlay">
+    <div class="search-top">
+      <input class="search-input" id="searchInput" placeholder="Search tasks…" autocomplete="off">
+      <button class="search-cancel" id="searchCancel">Cancel</button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+
+  <div class="quick-sched" id="quickSched">
+    <button class="qs-btn" data-qs="today">→ Today</button>
+    <button class="qs-btn" data-qs="tomorrow">→ Tomorrow</button>
+    <button class="qs-btn" data-qs="nextweek">→ Next week</button>
+    <button class="qs-btn danger" data-qs="drop">✕ Drop task</button>
+  </div>
+
   <main id="view"></main>
 
   <button id="fab" title="Add task">+</button>
@@ -800,6 +854,13 @@
       <button class="cal-days-btn" data-days="14">14 days</button>
       <button class="cal-days-btn" data-days="30">30 days</button>
     </div>
+    <div class="field-label" style="margin-top:16px">Default category for imports</div>
+    <div class="cal-days-row" id="calCatRow">
+      <button class="cal-days-btn active" data-cat="WORK">Work</button>
+      <button class="cal-days-btn" data-cat="VISION">Vision</button>
+      <button class="cal-days-btn" data-cat="PERSONAL">Personal</button>
+      <button class="cal-days-btn" data-cat="SKILL">Skills</button>
+    </div>
     <button class="primary-btn" id="calFetchBtn" style="margin-top:18px">Fetch events</button>
     <div id="calEventsList"></div>
     <div class="cal-btn-row" id="calImportRow" style="display:none">
@@ -838,6 +899,8 @@
         <button type="button" class="chip" data-rate="1.05">Brisk</button>
       </div>
       <div class="voice-hint" id="voiceHint"></div>
+      <div class="field-label" style="margin-top:16px">Google Sheets URL</div>
+      <input type="url" id="sheetUrlInput" placeholder="https://script.google.com/…" style="font-size:12px;background:var(--ink);border:1px solid var(--hairline);border-radius:10px;color:var(--ivory);padding:9px 12px;font-family:inherit;width:100%;box-sizing:border-box;outline:none">
     </div>
     <div class="brief-orb"></div>
     <div id="briefSection">Preparing</div>
@@ -889,27 +952,76 @@ function pruneOldCompletedRepeats() {
 pruneOldCompletedRepeats();
 
 // ── Google Sheets sync ──────────────────────────────────────────────────────
-// After deploying apps-script.gs, paste your web app URL here:
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbx-cJEh9Hd8nvkHrw0TKATqnc-3vfWhXZNn0Ec2fgemwhfq4Jx8I7PvdjCdvp0oc--3/exec';
+// Migrate hardcoded URL to localStorage on first run, then read from localStorage
+// so it can be changed via settings without a code push
+(function() {
+  const EMBEDDED = 'https://script.google.com/macros/s/AKfycbx-cJEh9Hd8nvkHrw0TKATqnc-3vfWhXZNn0Ec2fgemwhfq4Jx8I7PvdjCdvp0oc--3/exec';
+  if (!localStorage.getItem('arc.sheetUrl') && EMBEDDED) localStorage.setItem('arc.sheetUrl', EMBEDDED);
+})();
+let SHEET_URL = localStorage.getItem('arc.sheetUrl') || '';
+
+let _syncStatusTimer = null;
+function setSyncStatus(s) {
+  const dot = document.getElementById('syncDot');
+  if (dot) dot.className = 'sync-dot ' + s;
+  clearTimeout(_syncStatusTimer);
+  if (s === 'ok' || s === 'error') _syncStatusTimer = setTimeout(() => setSyncStatus('idle'), 3000);
+}
 
 function pushToSheet() {
   if (!SHEET_URL) return;
+  setSyncStatus('syncing');
   const payload = JSON.stringify({
-    tasks, vision, research, prefs: typeof prefs !== 'undefined' ? prefs : {},
-    archive: JSON.parse(localStorage.getItem('arc.archive') || '[]'),
-    syncedAt: new Date().toISOString()
+    tasks,
+    vision,
+    research,
+    meta: {
+      prefs: typeof prefs !== 'undefined' ? prefs : {},
+      archive: JSON.parse(localStorage.getItem('arc.archive') || '[]'),
+      syncedAt: new Date().toISOString()
+    }
   });
-  fetch(SHEET_URL, { method: 'POST', mode: 'no-cors', body: payload }).catch(() => {});
+  fetch(SHEET_URL, { method: 'POST', mode: 'no-cors', body: payload })
+    .then(() => setSyncStatus('ok'))
+    .catch(() => setSyncStatus('error'));
+}
+
+function mergeTasks(local, remote) {
+  const map = new Map();
+  for (const t of remote) map.set(t.id, t);
+  for (const t of local) {
+    const r = map.get(t.id);
+    if (!r || (t.updatedAt || 0) >= (r.updatedAt || 0)) map.set(t.id, t);
+  }
+  return [...map.values()];
 }
 
 async function pullFromSheet() {
   if (!SHEET_URL) return;
+  setSyncStatus('syncing');
   try {
     const res = await fetch(SHEET_URL + '?t=' + Date.now());
     const d = await res.json();
+
+    // Pull guard: warn if remote task count is suspiciously low
+    const remoteTasks = Array.isArray(d.tasks) ? d.tasks : [];
+    const localCount = tasks.length;
+    if (localCount > 3 && remoteTasks.length < localCount * 0.6 && remoteTasks.length < localCount - 3) {
+      const ok = await arcModal({
+        message: `Cloud has ${remoteTasks.length} task${remoteTasks.length!==1?'s':''}, your device has ${localCount}. Merge both safely?`,
+        buttons: [
+          { label: 'Merge (safe)', type: 'primary', value: true },
+          { label: 'Keep mine', type: 'secondary', value: false }
+        ]
+      });
+      if (!ok) { setSyncStatus('idle'); return; }
+    }
+
     let changed = false;
-    if (Array.isArray(d.tasks) && d.tasks.length) {
-      tasks = d.tasks; localStorage.setItem('meridian.tasks', JSON.stringify(tasks)); changed = true;
+    if (remoteTasks.length || localCount === 0) {
+      tasks = mergeTasks(tasks, remoteTasks);
+      localStorage.setItem('meridian.tasks', JSON.stringify(tasks));
+      changed = true;
     }
     if (d.vision && Object.keys(d.vision).length) {
       vision = Object.assign({ statement: '', target: '', milestones: [] }, d.vision);
@@ -918,12 +1030,21 @@ async function pullFromSheet() {
     if (Array.isArray(d.research)) {
       research = d.research; localStorage.setItem('arc.research', JSON.stringify(research)); changed = true;
     }
-    if (d.prefs && typeof prefs !== 'undefined') {
-      Object.assign(prefs, d.prefs); localStorage.setItem('meridian.prefs', JSON.stringify(prefs));
+    if (d.meta) {
+      if (d.meta.prefs && typeof prefs !== 'undefined') {
+        Object.assign(prefs, d.meta.prefs); localStorage.setItem('meridian.prefs', JSON.stringify(prefs));
+      }
+      if (d.meta.archive) localStorage.setItem('arc.archive', JSON.stringify(d.meta.archive));
+    } else {
+      // Backward compat: old format had prefs at top level
+      if (d.prefs && typeof prefs !== 'undefined') {
+        Object.assign(prefs, d.prefs); localStorage.setItem('meridian.prefs', JSON.stringify(prefs));
+      }
+      if (d.archive) localStorage.setItem('arc.archive', JSON.stringify(d.archive));
     }
-    if (d.archive) localStorage.setItem('arc.archive', JSON.stringify(d.archive));
+    setSyncStatus('ok');
     if (changed) render();
-  } catch (_) {}
+  } catch (_) { setSyncStatus('error'); }
 }
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -1183,6 +1304,7 @@ function taskRowHTML(t, timeLabel, part) {
         <div class="task-meta">
           <span class="pdot" style="background:${p.color}"></span>
           ${p.label} · ${cat(t.category).label} · ${t.estimate}m
+          ${!t.done ? `<button class="task-start-btn ${focusTaskId===t.id?'active':''}" onclick="event.stopPropagation();startFocus('${t.id}',${t.estimate||25})">▶ ${t.estimate||25}m</button>` : ''}
         </div>
         ${progressHTML}
         ${subtasksHTML}
@@ -1207,6 +1329,42 @@ function retroBar(pct, label) {
       <span class="retro-pct">${pct}<span style="font-size:9px;font-weight:400;opacity:0.5;letter-spacing:0;vertical-align:super;margin-left:1px">%</span></span>
       ${label ? `<span class="retro-label">${label}</span>` : ''}
     </div>
+  </div>`;
+}
+
+/* ---- Focus timer ---- */
+let focusTaskId = null, focusSeconds = 0, focusInterval = null;
+
+function startFocus(taskId, minutes) {
+  clearInterval(focusInterval);
+  focusTaskId = taskId;
+  focusSeconds = (minutes || 25) * 60;
+  focusInterval = setInterval(() => {
+    if (focusSeconds <= 0) {
+      clearInterval(focusInterval);
+      focusTaskId = null;
+      if (Notification.permission === 'granted') new Notification('Focus session done! Take a break.', { tag: 'arc-focus' });
+      render(); return;
+    }
+    focusSeconds--;
+    const el = document.getElementById('focusTime');
+    if (el) {
+      const m = Math.floor(focusSeconds/60), s = focusSeconds%60;
+      el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+  }, 1000);
+  render();
+}
+function stopFocus() { clearInterval(focusInterval); focusTaskId = null; focusSeconds = 0; render(); }
+function focusBarHTML() {
+  if (!focusTaskId) return '';
+  const t = tasks.find(x=>x.id===focusTaskId);
+  if (!t) return '';
+  const m = Math.floor(focusSeconds/60), s = focusSeconds%60;
+  return `<div class="focus-bar">
+    <div class="focus-task-title">${esc(t.title)}</div>
+    <div class="focus-time" id="focusTime">${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</div>
+    <button class="focus-stop" onclick="stopFocus()">Stop</button>
   </div>`;
 }
 
@@ -1253,9 +1411,18 @@ function renderToday() {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3l-4 4-4-4"/></svg>
           Meeting
         </button>
+        <button type="button" class="brief-launch" id="whatNowBtn" style="margin:0;background:var(--gold);color:#fff;font-weight:600">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          What now?
+        </button>
+        <button type="button" class="brief-launch" id="searchBtn" style="margin:0;background:var(--surface2);color:var(--ivory)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          Search
+        </button>
       </div>
     </div>
-    ${retroBar(pct, `${plan.completed.length} of ${total} done`)}`;
+    ${focusBarHTML()}
+    ${total > 0 ? retroBar(pct, `${plan.completed.length} of ${total} done`) : '<p style="color:var(--ivory-faint);font-size:13px;padding:4px 0 8px">Ready when you are.</p>'}`;
 
   if (plan.triage.length) {
     html += `<div class="triage">
@@ -1574,6 +1741,24 @@ function importBackup(e) {
   e.target.value = '';
 }
 
+/* ---- Milestone health ---- */
+function milestoneHealth(ms) {
+  if (!ms.target) return null;
+  const now = new Date();
+  const [ty, tm] = ms.target.split('-').map(Number);
+  const targetDate = new Date(ty, tm - 1, 1);
+  if (targetDate <= now) return { label: 'Overdue', color: '#E84444' };
+  const createdDate = ms.createdAt ? new Date(ms.createdAt) : new Date(now.getFullYear() - 1, now.getMonth());
+  const totalMs = Math.max(1, targetDate - createdDate);
+  const elapsedMs = now - createdDate;
+  const expected = Math.min(1, elapsedMs / totalMs);
+  const actual = milestoneProgress(ms);
+  const gap = expected - actual;
+  if (gap > 0.25) return { label: 'Off track', color: '#E84444' };
+  if (gap > 0.12) return { label: 'At risk', color: '#F5A623' };
+  return { label: 'On track', color: '#30D158' };
+}
+
 /* ---- Vision ---- */
 function renderVision() {
   const months = (() => {
@@ -1609,10 +1794,12 @@ function renderVision() {
     ${vision.milestones.map(ms => {
       const linked = tasks.filter(t => t.milestoneId === ms.id);
       const p = milestoneProgress(ms);
+      const h = milestoneHealth(ms);
       return `<div class="panel" style="margin-bottom:10px">
         <div class="cat-top">
           ${linked.length ? '' : `<input type="checkbox" class="sub-check" data-msdone="${ms.id}" ${ms.done ? 'checked' : ''}>`}
           <span style="flex:1">${esc(ms.title)}</span>
+          ${h ? `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:${h.color}22;color:${h.color}">${h.label}</span>` : ''}
           <span class="count">${ms.target ? fmtMonth(ms.target) : ''}${linked.length ? ' · ' + linked.filter(t=>t.done).length + '/' + linked.length + ' tasks' : ''}</span>
           <button type="button" class="sub-del" data-msdel="${ms.id}" title="Delete">×</button>
         </div>
@@ -1636,7 +1823,7 @@ function renderVision() {
     const title = document.getElementById('msNew').value.trim();
     if (!title) return;
     vision.milestones.push({ id: 'ms' + Date.now(), title,
-      target: document.getElementById('msNewT').value || '', done: false });
+      target: document.getElementById('msNewT').value || '', done: false, createdAt: Date.now() });
     saveVision(); renderVision();
   });
   view.querySelectorAll('[data-msdel]').forEach(b => b.addEventListener('click', () => {
@@ -1855,12 +2042,12 @@ function openEditor(task) {
     };
     if (editingId) {
       const t = tasks.find(x => x.id === editingId);
-      Object.assign(t, data, { notifiedAt: null });
+      Object.assign(t, data, { notifiedAt: null, updatedAt: Date.now() });
       if (t.repeat && !t.seriesId) t.seriesId = t.id;
     } else {
       const id = Date.now() + Math.random().toString(16).slice(2);
       tasks.push({ id, done: false, completedAt: null, createdAt: Date.now(),
-                   notifiedAt: null, nextSpawned: false,
+                   updatedAt: Date.now(), notifiedAt: null, nextSpawned: false,
                    seriesId: data.repeat ? id : null, ...data });
     }
     save(); closeEditor(); render();
@@ -2501,6 +2688,7 @@ function toggleTask(id) {
   withUndo(t.done ? 'Marked "' + t.title + '" not done' : 'Completed "' + t.title + '"', () => {
     t.done = !t.done;
     t.completedAt = t.done ? Date.now() : null;
+    t.updatedAt = Date.now();
     // Repeating task completed → queue the next occurrence (once)
     if (t.done && t.repeat && t.due && !t.nextSpawned) {
       const due = nextDueDate(t.due, t.repeat);
@@ -2522,6 +2710,57 @@ function toggleTask(id) {
       }
     }
   });
+}
+
+/* ---- What Now? ---- */
+function whatNow() {
+  const plan = planDay(todayStr());
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const cur = plan.blocks.find(b => b.start <= nowMin && b.end > nowMin && !b.task.done);
+  if (cur) {
+    arcModal({ message: `Focus on: "${cur.task.title}"\n${fmtTime(Math.floor(cur.start/60),cur.start%60)} – ${fmtTime(Math.floor(cur.end/60),cur.end%60)}`, buttons:[{label:'Got it',type:'primary',value:null}] });
+    return;
+  }
+  const next = plan.blocks.find(b => b.start > nowMin && !b.task.done);
+  if (next) {
+    const gap = next.start - nowMin;
+    arcModal({ message: `Next: "${next.task.title}" at ${fmtTime(Math.floor(next.start/60),next.start%60)}.\nYou have ${gap} min — take a break or do a quick task.`, buttons:[{label:'Got it',type:'primary',value:null}] });
+    return;
+  }
+  if (plan.overflow.length) {
+    arcModal({ message: `"${plan.overflow[0].title}" didn't fit today's schedule. Consider rescheduling or dropping it.`, buttons:[{label:'Got it',type:'primary',value:null}] });
+    return;
+  }
+  arcModal({ message: plan.completed.length ? `All done for today. Great work.` : `Nothing planned. Tap + to add your first task.`, buttons:[{label:'Nice',type:'primary',value:null}] });
+}
+
+/* ---- Search ---- */
+function openSearch() {
+  const ov = document.getElementById('searchOverlay');
+  ov.classList.add('open');
+  setTimeout(() => document.getElementById('searchInput').focus(), 100);
+}
+function closeSearch() {
+  document.getElementById('searchOverlay').classList.remove('open');
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchResults').innerHTML = '';
+}
+
+/* ---- Quick reschedule ---- */
+let qsTaskId = null, qsLongTimer = null;
+
+function showQuickSched(taskId, top, left) {
+  qsTaskId = taskId;
+  const el = document.getElementById('quickSched');
+  el.style.display = 'flex';
+  const maxTop = window.innerHeight - 200;
+  el.style.top = Math.min(top, maxTop) + 'px';
+  el.style.left = Math.max(10, Math.min(left, window.innerWidth - 180)) + 'px';
+}
+function hideQuickSched() {
+  document.getElementById('quickSched').style.display = 'none';
+  qsTaskId = null;
 }
 
 /* ================= Global events ================= */
@@ -2645,6 +2884,8 @@ document.getElementById('view').addEventListener('click', e => {
   if (Date.now() - lastSwipeAt < 400) return;
   if (e.target.closest('#briefBtn')) { startBrief(); return; }
   if (e.target.closest('#meetingBtn')) { openMeeting(); return; }
+  if (e.target.closest('#whatNowBtn')) { whatNow(); return; }
+  if (e.target.closest('#searchBtn')) { openSearch(); return; }
 
   // Research: rename project title (inline)
   const rpRename = e.target.closest('[data-rprename]');
@@ -3023,7 +3264,7 @@ calImportBtn.addEventListener('click', () => {
     const end = new Date(ev.end);
     const durMin = Math.round((end - start) / 60000);
     newTasks.push({
-      id: uid(), title: ev.title, category: 'WORK', priority: 'medium',
+      id: uid(), title: ev.title, category: calImportCat, priority: 'medium',
       due: dueDate, time: timeVal,
       duration: (!ev.allDay && durMin > 0 && durMin < 480) ? durMin : 60,
       notes: [ev.description, ev.location ? `Location: ${ev.location}` : ''].filter(Boolean).join('\n').trim(),
@@ -3045,6 +3286,96 @@ document.addEventListener('click', e => {
   if (e.target.id === 'calSyncBtn') openCalSheet();
 });
 
+/* ---- Evening wrap-up ---- */
+function eveningWrap() {
+  const now = new Date();
+  if (now.getHours() !== 21 || now.getMinutes() > 15) return;
+  if (localStorage.getItem('arc.wrapDone') === todayStr()) return;
+  const incomplete = tasks.filter(t => t.due === todayStr() && !t.done);
+  if (!incomplete.length) return;
+  localStorage.setItem('arc.wrapDone', todayStr());
+  arcModal({
+    message: `Day wrap: ${incomplete.length} task${incomplete.length!==1?'s':''} unfinished today.\nRoll them all to tomorrow?`,
+    buttons: [
+      { label: 'Roll to tomorrow', type: 'primary', value: true },
+      { label: 'Leave them', type: 'secondary', value: false }
+    ]
+  }).then(ok => {
+    if (!ok) return;
+    const tom = offsetDate(todayStr(), 1);
+    incomplete.forEach(t => { t.due = tom; t.updatedAt = Date.now(); });
+    save(); render();
+    showUndo(`${incomplete.length} task${incomplete.length!==1?'s':''} moved to tomorrow`, null);
+  });
+}
+setInterval(eveningWrap, 60000);
+eveningWrap();
+
+/* ---- Search input listeners ---- */
+document.getElementById('searchInput').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) { document.getElementById('searchResults').innerHTML = ''; return; }
+  const hits = tasks.filter(t => t.title.toLowerCase().includes(q) || (t.notes||'').toLowerCase().includes(q)).slice(0,30);
+  document.getElementById('searchResults').innerHTML = hits.length
+    ? hits.map(t => taskRowHTML(t, t.time || '')).join('')
+    : `<p style="color:var(--ivory-dim);text-align:center;padding:30px 0">No tasks match "${esc(e.target.value)}"</p>`;
+  document.getElementById('searchResults').querySelectorAll('.task-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const t = tasks.find(x => x.id === row.dataset.id);
+      if (t) { closeSearch(); openEditor(t); }
+    });
+  });
+});
+document.getElementById('searchCancel').addEventListener('click', closeSearch);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSearch(); });
+
+/* ---- Quick reschedule long-press ---- */
+document.getElementById('view').addEventListener('pointerdown', e => {
+  const row = e.target.closest('.task-row');
+  if (!row || !row.dataset.id) return;
+  qsLongTimer = setTimeout(() => {
+    showQuickSched(row.dataset.id, e.clientY - 20, e.clientX - 80);
+  }, 500);
+});
+document.getElementById('view').addEventListener('pointerup', () => clearTimeout(qsLongTimer));
+document.getElementById('view').addEventListener('pointermove', () => clearTimeout(qsLongTimer));
+
+document.getElementById('quickSched').addEventListener('click', e => {
+  const btn = e.target.closest('[data-qs]');
+  if (!btn || !qsTaskId) { hideQuickSched(); return; }
+  const t = tasks.find(x => x.id === qsTaskId);
+  if (!t) { hideQuickSched(); return; }
+  const action = btn.dataset.qs;
+  if (action === 'today') { t.due = todayStr(); t.updatedAt = Date.now(); save(); render(); }
+  else if (action === 'tomorrow') { t.due = offsetDate(todayStr(), 1); t.updatedAt = Date.now(); save(); render(); }
+  else if (action === 'nextweek') { t.due = offsetDate(todayStr(), 7); t.updatedAt = Date.now(); save(); render(); }
+  else if (action === 'drop') {
+    arcModal({ message: `Drop "${t.title}"? It will be deleted.`, buttons: [{label:'Cancel',type:'secondary',value:false},{label:'Drop it',type:'danger',value:true}] })
+      .then(ok => { if(ok) { tasks = tasks.filter(x=>x.id!==t.id); save(); render(); } });
+  }
+  hideQuickSched();
+});
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('#quickSched')) hideQuickSched();
+});
+
+/* ---- Calendar category picker ---- */
+let calImportCat = 'WORK';
+document.getElementById('calCatRow').addEventListener('click', e => {
+  const btn = e.target.closest('[data-cat]');
+  if (!btn) return;
+  document.querySelectorAll('#calCatRow .cal-days-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  calImportCat = btn.dataset.cat;
+});
+
+/* ---- Sheet URL input (in voice panel) ---- */
+document.getElementById('sheetUrlInput').value = SHEET_URL;
+document.getElementById('sheetUrlInput').addEventListener('change', e => {
+  SHEET_URL = e.target.value.trim();
+  localStorage.setItem('arc.sheetUrl', SHEET_URL);
+});
+
 /* ── Auto-update checker ─────────────────────────────────────────────────── */
 (async function checkVersion() {
   try {
@@ -3060,6 +3391,10 @@ document.addEventListener('click', e => {
   setTimeout(checkVersion, 5 * 60 * 1000);
 })();
 /* ─────────────────────────────────────────────────────────────────────────── */
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
 
 render();
 pullFromSheet();
