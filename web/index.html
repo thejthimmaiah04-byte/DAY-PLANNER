@@ -100,11 +100,17 @@
   .pdot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
   .task-time { font-size: 13px; font-weight: 600; color: var(--gold); white-space: nowrap; }
 
-  /* ---- Progress line ---- */
-  .progress-wrap { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
-  .progress-track { flex: 1; height: 4px; background: var(--hairline); border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: var(--gold); border-radius: 2px; transition: width .4s ease; }
+  /* ---- Piano-key progress bar ---- */
+  .progress-wrap { display: flex; align-items: center; gap: 12px; }
   .progress-text { font-size: 13px; color: var(--ivory-dim); white-space: nowrap; }
+  .piano-bar { flex: 1; display: flex; align-items: flex-end; gap: 1.5px; height: 30px; }
+  .pk { border-radius: 0 0 3px 3px; transition: background .25s; }
+  .pk-w { flex: 10; height: 100%; }
+  .pk-b { flex: 6; height: 62%; align-self: flex-start; border-radius: 0 0 2px 2px; }
+  .pk-w.on  { background: var(--gold); }
+  .pk-w.off { background: var(--surface2); }
+  .pk-b.on  { background: #cc3300; }
+  .pk-b.off { background: #0d0d0d; }
 
   /* ---- Chips ---- */
   .chip-row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
@@ -972,15 +978,11 @@ function taskRowHTML(t, timeLabel, part) {
   const subsPct = subsTotal ? Math.round(subsDone / subsTotal * 100) : 0;
   const isExpanded = expandedTaskId === t.id;
 
-  // Collapsed retro progress bar (only when not expanded)
+  // Collapsed piano-key progress bar (only when not expanded)
   let progressHTML = '';
   if (subsTotal > 0 && !isExpanded) {
-    const SEGS = 28;
-    const filled = Math.round(subsPct / 100 * SEGS);
-    const segs = Array.from({length: SEGS}, (_, i) =>
-      `<div class="retro-seg${i < filled ? ' on' : ''}"></div>`).join('');
     progressHTML = `<div class="retro-bar">
-      <div class="retro-segs">${segs}</div>
+      ${pianoBar(subsPct)}
       <div class="retro-inline-label">
         <span class="retro-pct">${subsPct}%</span>
         <span class="retro-label">${subsDone}/${subsTotal}</span>
@@ -1045,6 +1047,20 @@ function emptyHTML(title, sub) {
   return `<div class="empty"><div class="empty-orb"></div><h3>${title}</h3><p>${sub}</p></div>`;
 }
 
+/* ---- Piano-key progress bar helper ---- */
+const PIANO_OCT = [0,1,0,1,0,0,1,0,1,0,1,0]; // white=0, black=1 per octave
+function pianoBar(pct) {
+  const KEYS = 24;
+  const lit = Math.round(pct / 100 * KEYS);
+  return '<div class="piano-bar">' +
+    Array.from({length: KEYS}, (_, i) => {
+      const black = PIANO_OCT[i % 12] === 1;
+      const on = i < lit;
+      return `<div class="pk ${black ? 'pk-b' : 'pk-w'} ${on ? 'on' : 'off'}"></div>`;
+    }).join('') +
+  '</div>';
+}
+
 /* ---- Today ---- */
 function renderToday() {
   const plan = planDay(todayStr());
@@ -1091,7 +1107,7 @@ function renderToday() {
       </div>
     </div>
     <div class="progress-wrap" style="margin-top:10px">
-      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      ${pianoBar(pct)}
       <div class="progress-text">${plan.completed.length} of ${total} done</div>
     </div>`;
 
@@ -1435,7 +1451,7 @@ function renderVision() {
 
     <div class="section-label">Overall progress</div>
     <div class="progress-wrap" style="margin-top:6px">
-      <div class="progress-track"><div class="progress-fill" style="width:${Math.round(overall*100)}%"></div></div>
+      ${pianoBar(Math.round(overall * 100))}
       <div class="progress-text">${Math.round(overall*100)}%</div>
     </div>
 
