@@ -1,0 +1,773 @@
+<title>ARC · Build preview</title>
+<style>
+  :root {
+    /* ARC's own palette, honored from Color.kt */
+    --ink: #0B0C10;
+    --surface1: #13141A;
+    --surface2: #1A1C23;
+    --hairline: #262832;
+    --ivory: #F2EEE5;
+    --ivory-dim: #9C9CA6;
+    --ivory-faint: #5E5F6A;
+    --champagne: #D4B476;
+    --champagne-deep: #A88946;
+    --on-champagne: #1C1505;
+    --terracotta: #C96F5A;
+    --sage: #8FA98F;
+    --slate: #7C8493;
+
+    /* page ground — a warmer, faintly gold-biased dark so the phones sit above it */
+    --page: #0d0e12;
+    --page-raise: #14151b;
+
+    --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #16171d 0%, var(--page) 55%),
+      var(--page);
+    color: var(--ivory);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 72px 28px 120px;
+  }
+
+  /* ---------- page header ---------- */
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--champagne);
+    margin: 0 0 18px;
+  }
+  h1.title {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(38px, 6vw, 62px);
+    line-height: 1.02;
+    letter-spacing: -0.01em;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  h1.title em { font-style: italic; color: var(--champagne); }
+  .lede {
+    max-width: 62ch;
+    color: var(--ivory-dim);
+    font-size: 17px;
+    margin: 0;
+  }
+  .note {
+    margin-top: 22px;
+    padding: 14px 18px;
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    background: var(--page-raise);
+    color: var(--ivory-dim);
+    font-size: 13.5px;
+    max-width: 66ch;
+  }
+  .note b { color: var(--ivory); font-weight: 600; }
+
+  .rule {
+    height: 1px;
+    background: linear-gradient(90deg, var(--hairline), transparent);
+    margin: 60px 0;
+    border: 0;
+  }
+
+  /* ---------- feature layout ---------- */
+  .feature {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 56px;
+    align-items: start;
+    margin: 0 0 76px;
+  }
+  .feature:nth-child(even) { grid-template-columns: 1fr 340px; }
+  .feature:nth-child(even) .phone-col { order: 2; }
+
+  .notes { padding-top: 8px; }
+  .fnum {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 15px;
+    color: var(--champagne-deep);
+    letter-spacing: 0.02em;
+  }
+  .notes h2 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 30px;
+    line-height: 1.1;
+    margin: 6px 0 14px;
+    text-wrap: balance;
+  }
+  .notes p { color: var(--ivory-dim); margin: 0 0 16px; max-width: 46ch; }
+  .notes p strong { color: var(--ivory); font-weight: 600; }
+  .howto {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .howto li {
+    position: relative;
+    padding-left: 22px;
+    font-size: 14.5px;
+    color: var(--ivory-dim);
+  }
+  .howto li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 8px;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--champagne);
+  }
+  .howto li b { color: var(--ivory); font-weight: 600; }
+
+  /* ---------- phone shell ---------- */
+  .phone-col { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .phone {
+    width: 340px;
+    background: #05060a;
+    border-radius: 42px;
+    padding: 11px;
+    box-shadow:
+      0 0 0 1px #202128,
+      0 40px 90px -34px rgba(0,0,0,0.95);
+  }
+  .screen {
+    background: var(--ink);
+    border-radius: 32px;
+    overflow: hidden;
+    position: relative;
+  }
+  .statusbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 22px 4px;
+    font-size: 12px;
+    color: var(--ivory-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .statusbar .dots { display: flex; gap: 4px; align-items: center; }
+  .statusbar .bar { width: 3px; border-radius: 1px; background: var(--ivory-dim); }
+  .content { padding: 8px 18px 26px; }
+  .caption {
+    font-size: 12.5px;
+    color: var(--ivory-faint);
+    letter-spacing: 0.04em;
+    text-align: center;
+  }
+
+  /* ---------- shared screen bits ---------- */
+  .scr-date { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--champagne); }
+  .scr-h {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 34px;
+    margin: 8px 0 0;
+    letter-spacing: -0.01em;
+  }
+  .scr-sub { color: var(--ivory-dim); font-size: 13.5px; }
+  .sec-label {
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ivory-faint);
+    margin: 20px 0 8px;
+  }
+
+  .gearrow { display: flex; align-items: center; justify-content: space-between; }
+  .gear { color: var(--ivory-dim); font-size: 17px; }
+
+  /* barcode progress */
+  .barcode { display: flex; gap: 3px; height: 30px; margin: 10px 0 4px; }
+  .barcode i { flex: 1; border-radius: 2px; background: var(--hairline); }
+  .barcode i.on { background: var(--champagne); }
+
+  .brief-row { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+  .btn-outline {
+    border: 1px solid var(--champagne-deep);
+    color: var(--champagne);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .btn-ghost { color: var(--ivory-dim); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+
+  /* task row */
+  .task {
+    background: var(--surface1);
+    border-radius: 16px;
+    padding: 13px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 9px;
+  }
+  .checkdot {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 1.5px solid var(--slate);
+    flex: none;
+  }
+  .checkdot.urgent { border-color: var(--terracotta); }
+  .checkdot.high { border-color: var(--champagne); }
+  .task .tt { flex: 1; min-width: 0; }
+  .task .tt .name { font-size: 15px; color: var(--ivory); }
+  .task .tt .meta { font-size: 12px; color: var(--ivory-dim); margin-top: 3px; display: flex; align-items: center; gap: 6px; }
+  .pdot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+  .time { color: var(--champagne); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .handle { color: var(--ivory-faint); font-size: 20px; line-height: 1; cursor: grab; letter-spacing: -2px; }
+  .task.lifted {
+    border: 1px solid var(--champagne);
+    box-shadow: 0 18px 34px -14px rgba(0,0,0,0.85);
+    transform: translateY(-2px) scale(1.015);
+    background: var(--surface2);
+  }
+  .task.lifted .handle { color: var(--champagne); }
+  .drop-ghost {
+    height: 52px;
+    border: 1px dashed var(--champagne-deep);
+    border-radius: 16px;
+    margin-bottom: 9px;
+    opacity: 0.5;
+  }
+
+  /* banners */
+  .banner {
+    border-radius: 14px;
+    padding: 13px 15px;
+    font-size: 13px;
+    margin: 4px 0 10px;
+    line-height: 1.45;
+  }
+  .banner.warn {
+    background: rgba(201,111,90,0.10);
+    border: 1px solid rgba(201,111,90,0.38);
+    color: var(--terracotta);
+  }
+  .banner.gold {
+    background: rgba(212,180,118,0.07);
+    border: 1px solid rgba(168,137,70,0.4);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .banner.gold .bt { flex: 1; }
+  .banner.gold .bt .m { color: var(--ivory); font-size: 13px; }
+  .banner.gold .bt .s { color: var(--ivory-dim); font-size: 12.5px; }
+  .banner.gold .still { color: var(--champagne); font-size: 13px; font-weight: 600; white-space: nowrap; }
+
+  /* cards */
+  .card { background: var(--surface1); border-radius: 18px; padding: 16px; margin-bottom: 10px; }
+  .card .ct { font-size: 15px; color: var(--ivory); font-weight: 500; }
+
+  /* vision check pills */
+  .checkpills { display: flex; gap: 8px; margin-top: 12px; }
+  .cpill {
+    flex: 1; text-align: center; padding: 10px 0;
+    border-radius: 10px; border: 1px solid var(--hairline);
+    color: var(--ivory-dim); font-size: 13px; font-weight: 500;
+  }
+  .cpill.sel { border-color: var(--champagne); background: rgba(212,180,118,0.14); color: var(--champagne); }
+
+  /* stat cards */
+  .statrow { display: flex; gap: 10px; margin-bottom: 10px; }
+  .stat { flex: 1; background: var(--surface1); border-radius: 18px; padding: 16px; }
+  .stat .v { font-family: var(--font-display); font-size: 32px; color: var(--champagne); line-height: 1; }
+  .stat .l { color: var(--ivory-dim); font-size: 12.5px; margin-top: 6px; }
+
+  /* efficiency */
+  .effbig { display: flex; align-items: flex-end; gap: 10px; margin-top: 4px; }
+  .effbig .pct { font-family: var(--font-display); font-size: 46px; color: var(--champagne); line-height: 0.9; }
+  .effbig .delta { background: rgba(143,169,143,0.18); color: var(--sage); border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+  .effbig .vs { color: var(--ivory-faint); font-size: 12px; margin-bottom: 10px; }
+
+  /* vision alignment heatmap */
+  .vheat { display: flex; gap: 4px; }
+  .vheat .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .vheat .cell { width: 100%; height: 34px; border-radius: 4px; }
+  .vheat .d { font-size: 9.5px; color: var(--ivory-faint); }
+  .vlegend { display: flex; gap: 16px; margin-top: 12px; }
+  .vlegend span { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ivory-faint); }
+  .vlegend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  /* reflection */
+  .qblock { margin-bottom: 22px; }
+  .qnum { font-size: 11px; letter-spacing: 0.1em; color: var(--champagne); }
+  .qtext { font-size: 15px; color: var(--ivory); margin: 5px 0 9px; font-weight: 500; }
+  .qfield {
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 12px 13px;
+    font-size: 13.5px;
+    color: var(--ivory);
+    background: transparent;
+    min-height: 58px;
+  }
+  .qfield.filled { border-color: var(--champagne-deep); }
+  .qfield .cursor { color: var(--champagne); }
+  .btn-fill {
+    background: var(--champagne);
+    color: var(--on-champagne);
+    text-align: center;
+    border-radius: 14px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  .close-x { color: var(--ivory-dim); font-size: 20px; }
+
+  /* day clock canvas */
+  .clockwrap { display: flex; flex-direction: column; align-items: center; margin: 6px 0 2px; }
+  canvas.clock { width: 260px; height: 260px; }
+
+  /* nav bar */
+  .nav {
+    display: flex; justify-content: space-around;
+    padding: 10px 6px 14px;
+    background: var(--surface1);
+    border-top: 1px solid var(--hairline);
+  }
+  .nav .item { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 9.5px; color: var(--ivory-faint); }
+  .nav .item.on { color: var(--champagne); }
+  .nav .ic { width: 22px; height: 22px; border-radius: 7px; border: 1.6px solid currentColor; opacity: 0.9; }
+  .nav .item.on .ic { background: var(--champagne); border-color: var(--champagne); }
+
+  @media (max-width: 860px) {
+    .feature, .feature:nth-child(even) { grid-template-columns: 1fr; gap: 26px; }
+    .feature:nth-child(even) .phone-col { order: 0; }
+    .phone { width: 320px; }
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">ARC · Build preview</p>
+  <h1 class="title">Five ways ARC now turns<br><em>data into self-awareness</em></h1>
+  <p class="lede">The planner used to tell you what to do and count what got done. These five additions make it notice patterns, bend to your judgement, and keep pulling you back to the two-year vision.</p>
+  <div class="note">
+    <b>These are faithful mockups, not live screenshots.</b> There's no Android emulator in the dev environment, so I rebuilt the exact screens I coded — same champagne-gold palette, same layout, same copy — in the browser. The real thing looks like this once you flash the debug APK to your phone. Display type approximates Fraunces here (the app ships the real face).
+  </div>
+
+  <hr class="rule">
+
+  <!-- ============ 1. TODAY: drag + overcommit + clock ring ============ -->
+  <section class="feature">
+    <div class="phone-col">
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>16:04</span>
+            <span class="dots">
+              <span class="bar" style="height:7px"></span>
+              <span class="bar" style="height:9px"></span>
+              <span class="bar" style="height:11px"></span>
+              <span>78%</span>
+            </span>
+          </div>
+          <div class="content">
+            <div class="gearrow">
+              <span class="scr-date">Tuesday, July 28</span>
+              <span class="gear">⚙</span>
+            </div>
+            <div class="scr-h">Good afternoon</div>
+            <div class="scr-sub" style="margin-top:14px">3 of 8 done</div>
+            <div class="barcode">
+              <script>for(let i=0;i<34;i++)document.write('<i class="'+(i<13?'on':'')+'"></i>')</script>
+            </div>
+
+            <div class="clockwrap">
+              <canvas class="clock" id="clk" width="520" height="520"></canvas>
+            </div>
+
+            <div class="banner warn">2 urgent tasks still open — your work window closes at 17:00.</div>
+
+            <div class="sec-label">Your plan</div>
+
+            <div class="task">
+              <div class="checkdot urgent"></div>
+              <div class="tt">
+                <div class="name">Finish policy brief draft</div>
+                <div class="meta"><span class="pdot" style="background:var(--terracotta)"></span>Urgent · Work · 55m</div>
+              </div>
+              <span class="time">14:00</span>
+              <span class="handle">≡</span>
+            </div>
+
+            <div class="drop-ghost"></div>
+
+            <div class="task lifted">
+              <div class="checkdot high"></div>
+              <div class="tt">
+                <div class="name">Revise GS2 governance notes</div>
+                <div class="meta"><span class="pdot" style="background:var(--champagne)"></span>High · Skill Building · 30m</div>
+              </div>
+              <span class="time">15:00</span>
+              <span class="handle">≡</span>
+            </div>
+
+            <div class="task">
+              <div class="checkdot"></div>
+              <div class="tt">
+                <div class="name">Team sync</div>
+                <div class="meta"><span class="pdot" style="background:var(--sage)"></span>Medium · Work · 30m</div>
+              </div>
+              <span class="time">16:00</span>
+              <span class="handle">≡</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="caption">Today — long-press a handle to lift a task; the ghost slot shows where it lands</p>
+    </div>
+
+    <div class="notes">
+      <span class="fnum">i — ii — iv</span>
+      <h2>The plan bends to you, and warns before it's too late</h2>
+      <p><strong>Drag-to-reorder.</strong> Every plan row now has a grip on the right. Long-press it and drag — the task lifts, a dashed slot shows where it'll drop, and the planner treats your placement as a pinned override instead of re-sorting it away.</p>
+      <p><strong>Overcommit warning.</strong> When urgent tasks are still open and your work window is within an hour of closing, a terracotta banner says so plainly — reactive triage was the morning-after fix; this is the during-the-day nudge.</p>
+      <p><strong>A day clock that isn't just decorative.</strong> The ring around the current slot turns from gold to terracotta the moment urgent work is still pending, so overcommitment reads at a glance.</p>
+      <ul class="howto">
+        <li><b>To reorder:</b> long-press the ≡ grip, drag up or down, release.</li>
+        <li><b>The gold "14:00 / 15:00" times</b> recompute around your manual order.</li>
+        <li><b>Red ring or red banner</b> = urgent work is racing the clock.</li>
+      </ul>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ============ 2. WEEKLY REFLECTION ============ -->
+  <section class="feature">
+    <div class="phone-col">
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>21:02</span>
+            <span class="dots">
+              <span class="bar" style="height:7px"></span>
+              <span class="bar" style="height:9px"></span>
+              <span class="bar" style="height:11px"></span>
+              <span>64%</span>
+            </span>
+          </div>
+          <div class="content" style="padding-top:20px">
+            <div class="gearrow" style="align-items:flex-start">
+              <div>
+                <div class="scr-h" style="font-size:30px">Weekly Reflection</div>
+                <div class="scr-sub" style="margin-top:6px">30 seconds of honest reflection changes next week.</div>
+              </div>
+              <span class="close-x">✕</span>
+            </div>
+
+            <div style="height:28px"></div>
+
+            <div class="qblock">
+              <div class="qnum">01</div>
+              <div class="qtext">What was your best day this week, and why?</div>
+              <div class="qfield filled">Wednesday — three deep-work blocks before noon, no meetings to break the flow.</div>
+            </div>
+
+            <div class="qblock">
+              <div class="qnum">02</div>
+              <div class="qtext">What got in the way?</div>
+              <div class="qfield filled">Thursday and Friday, urgent work crowded out my Vision revision every time.</div>
+            </div>
+
+            <div class="qblock">
+              <div class="qnum">03</div>
+              <div class="qtext">One adjustment for next week.</div>
+              <div class="qfield filled">Protect 8–9am for GS notes before I open email.<span class="cursor">|</span></div>
+            </div>
+
+            <div class="btn-fill">Save reflection</div>
+          </div>
+        </div>
+      </div>
+      <p class="caption">Weekly Reflection — reached from the Sunday wind-down notification</p>
+    </div>
+
+    <div class="notes">
+      <span class="fnum">i</span>
+      <h2>A 30-second Sunday reflection that actually asks "what happened?"</h2>
+      <p>Percentages and streaks never explained <em>why</em> a week went the way it did. Three honest questions do — the best day and its cause, the thing that got in the way, and one concrete adjustment.</p>
+      <p><strong>Sunday nudge.</strong> The 21:00 wind-down notification on Sundays gains a <strong>"Reflect on week"</strong> action that opens this screen directly. Skip it and nothing nags; it just waits.</p>
+      <ul class="howto">
+        <li><b>Kept for 12 weeks</b> so patterns become visible over a season.</li>
+        <li><b>Any one answer</b> is enough to save — no all-or-nothing form.</li>
+        <li>The numbering here <b>is a real sequence</b> — cause, obstacle, adjustment.</li>
+      </ul>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ============ 3. VISION: daily check + 30-day banner ============ -->
+  <section class="feature">
+    <div class="phone-col">
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>21:06</span>
+            <span class="dots">
+              <span class="bar" style="height:7px"></span>
+              <span class="bar" style="height:9px"></span>
+              <span class="bar" style="height:11px"></span>
+              <span>63%</span>
+            </span>
+          </div>
+          <div class="content" style="padding-top:18px">
+            <div class="scr-h" style="font-size:30px">2-Year Vision</div>
+
+            <div style="height:14px"></div>
+
+            <div class="banner gold">
+              <div class="bt">
+                <div class="m">Your vision was last reviewed 34 days ago.</div>
+                <div class="s">Read it below — still true?</div>
+              </div>
+              <div class="still">Still true</div>
+            </div>
+
+            <div class="card" style="background:transparent;border:1px solid var(--hairline);padding:15px">
+              <div style="font-family:var(--font-display);font-size:16px;line-height:1.5;color:var(--ivory)">
+                I am a calm, well-prepared civil servant — I clear UPSC, lead with integrity at the Liana Trust, and keep learning every single day.
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;margin:12px 0 4px">
+              <span class="btn-outline">July 2027</span>
+              <span class="scr-sub">12 months remaining</span>
+            </div>
+
+            <div class="card">
+              <div class="ct">Did today serve your vision?</div>
+              <div class="checkpills">
+                <div class="cpill">Yes</div>
+                <div class="cpill sel">Partially</div>
+                <div class="cpill">No</div>
+              </div>
+            </div>
+
+            <div class="sec-label">Overall progress</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--hairline);overflow:hidden">
+                <div style="width:46%;height:100%;background:var(--champagne)"></div>
+              </div>
+              <span class="scr-sub">46%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="caption">Vision — the daily check logs a parallel streak; the gold banner returns every 30 days</p>
+    </div>
+
+    <div class="notes">
+      <span class="fnum">iii — v</span>
+      <h2>The vision stops being wallpaper and starts asking questions</h2>
+      <p><strong>A daily honest check.</strong> One tap — Yes, Partially, or No — answers whether today actually moved you toward the vision. It feeds a second streak that runs <em>parallel</em> to task completion, the real difference between a planner and a vision-realization tool.</p>
+      <p><strong>A 30-day return to intent.</strong> After a month, a soft gold banner resurfaces your own words and asks if they still hold. <strong>"Still true"</strong> resets the clock for another 30 days; editing the statement resets it too.</p>
+      <ul class="howto">
+        <li><b>"No"</b> breaks the vision streak — honesty is the point, not gaming it.</li>
+        <li>The 30-day nudge <b>also rides the evening notification</b> when it's due.</li>
+        <li>Your answer for today <b>stays selected</b> if you reopen the screen.</li>
+      </ul>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ============ 4. PROGRESS: vision streak + heatmap ============ -->
+  <section class="feature">
+    <div class="phone-col">
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>21:08</span>
+            <span class="dots">
+              <span class="bar" style="height:7px"></span>
+              <span class="bar" style="height:9px"></span>
+              <span class="bar" style="height:11px"></span>
+              <span>63%</span>
+            </span>
+          </div>
+          <div class="content" style="padding-top:18px">
+            <div class="scr-h" style="font-size:30px">Progress</div>
+
+            <div class="card" style="border-radius:20px;padding:18px;margin-top:12px">
+              <div class="ct">Weekly efficiency</div>
+              <div class="scr-sub" style="margin-top:3px">You are ahead of last week — keep the momentum.</div>
+              <div class="effbig">
+                <span class="pct">82%</span>
+                <span class="delta">↗ 9%</span>
+                <span class="vs">vs. last week</span>
+              </div>
+              <div class="barcode" style="margin-top:14px">
+                <script>for(let i=0;i<34;i++)document.write('<i class="'+(i<28?'on':'')+'"></i>')</script>
+              </div>
+            </div>
+
+            <div class="statrow">
+              <div class="stat"><div class="v">6</div><div class="l">task streak</div></div>
+              <div class="stat"><div class="v">9</div><div class="l">vision streak</div></div>
+            </div>
+            <div class="statrow">
+              <div class="stat"><div class="v">4.5h</div><div class="l">focus this week</div></div>
+              <div class="stat"><div class="v">12</div><div class="l">done this week</div></div>
+            </div>
+
+            <div class="sec-label">Vision alignment · last 14 days</div>
+            <div class="card">
+              <div class="vheat" id="vheat"></div>
+              <div class="vlegend">
+                <span><i style="background:var(--champagne)"></i>Yes</span>
+                <span><i style="background:var(--sage)"></i>Partial</span>
+                <span><i style="background:rgba(201,111,90,0.7)"></i>No</span>
+              </div>
+            </div>
+          </div>
+          <div class="nav">
+            <div class="item"><span class="ic"></span>Today</div>
+            <div class="item"><span class="ic"></span>Tasks</div>
+            <div class="item"><span class="ic"></span>Calendar</div>
+            <div class="item"><span class="ic"></span>Vision</div>
+            <div class="item on"><span class="ic"></span>Progress</div>
+          </div>
+        </div>
+      </div>
+      <p class="caption">Progress — the vision streak sits beside the task streak; alignment reads as a 14-day strip</p>
+    </div>
+
+    <div class="notes">
+      <span class="fnum">iii</span>
+      <h2>Two streaks, side by side — because doing things ≠ doing the right things</h2>
+      <p>The <strong>vision streak</strong> now stands next to the task streak. You can have a spotless task week and a broken vision streak — and <em>that gap is the insight</em> the old screen could never show.</p>
+      <p><strong>A 14-day alignment strip</strong> colors each day gold, sage, or terracotta for Yes / Partially / No. A run of terracotta on weekdays is exactly the "urgent work crowds out the vision by Thursday" pattern made visible.</p>
+      <ul class="howto">
+        <li><b>Gold</b> = served the vision, <b>sage</b> = partially, <b>terracotta</b> = no.</li>
+        <li><b>Faint slots</b> are days you didn't answer — no guilt, just gaps.</li>
+        <li>Everything here is <b>computed on-device</b> from your daily checks.</li>
+      </ul>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  // ---- Day clock (faithful to DayClock.kt) ----
+  (function () {
+    const cv = document.getElementById('clk');
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const S = cv.width;                // 520 backing px
+    const cx = S / 2, cy = S / 2;
+    const midR = S * 0.315;
+    const stroke = S * 0.135;
+    const dim = '#2B2D36', gold = '#D4B476', terra = '#C96F5A';
+
+    // occupancy per 2-hour slot (0..1)
+    const occ = [0,0,0,0.2,0.6,1,0.5,0.9,0.7,0.4,0.3,0];
+    const currentSlot = 8;             // ~16:00
+    const urgentPending = true;
+    const nowMin = 16 * 60 + 4;
+
+    function lerp(a, b, t) {
+      const ah = parseInt(a.slice(1),16), bh = parseInt(b.slice(1),16);
+      const ar=(ah>>16)&255, ag=(ah>>8)&255, ab=ah&255;
+      const br=(bh>>16)&255, bg=(bh>>8)&255, bb=bh&255;
+      const r=Math.round(ar+(br-ar)*t), g=Math.round(ag+(bg-ag)*t), bl=Math.round(ab+(bb-ab)*t);
+      return 'rgb('+r+','+g+','+bl+')';
+    }
+    const rad = d => (d) * Math.PI / 180;
+    const gap = 9;
+
+    ctx.clearRect(0,0,S,S);
+    for (let i=0;i<12;i++){
+      const centerAngle = -90 + i*30;
+      const start = centerAngle - 15 + gap/2;
+      const sweep = 30 - gap;
+      ctx.beginPath();
+      ctx.lineWidth = stroke;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = lerp(dim, gold, occ[i]);
+      ctx.arc(cx, cy, midR, rad(start), rad(start+sweep));
+      ctx.stroke();
+
+      if (i === currentSlot){
+        const rr = midR + stroke/2 + 6;
+        ctx.beginPath();
+        ctx.lineWidth = urgentPending ? 4 : 3;
+        ctx.strokeStyle = urgentPending ? terra : gold;
+        ctx.arc(cx, cy, rr, rad(start), rad(start+sweep));
+        ctx.stroke();
+      }
+    }
+
+    // now marker dot
+    const nowAngle = rad(-90 + nowMin/1440*360);
+    const nowR = midR + stroke/2 + 18;
+    ctx.beginPath();
+    ctx.fillStyle = gold;
+    ctx.arc(cx + nowR*Math.cos(nowAngle), cy + nowR*Math.sin(nowAngle), 7, 0, Math.PI*2);
+    ctx.fill();
+
+    // hour labels (black pills)
+    ctx.font = '600 20px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let i=0;i<12;i++){
+      const a = rad(-90 + i*30);
+      const lx = cx + midR*Math.cos(a), ly = cy + midR*Math.sin(a);
+      const label = String(i*2).padStart(2,'0');
+      const w = 34, h = 26;
+      ctx.fillStyle = '#000';
+      const r = 7, x = lx-w/2, y = ly-h/2;
+      ctx.beginPath();
+      ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+      ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillText(label, lx, ly+1);
+    }
+
+    // center summary
+    const totalMin = Math.round(occ.reduce((a,b)=>a+b,0)*120);
+    ctx.fillStyle = gold;
+    ctx.font = '400 34px Georgia, serif';
+    ctx.fillText(Math.floor(totalMin/60)+'h '+(totalMin%60)+'m', cx, cy-6);
+    ctx.fillStyle = '#9C9CA6';
+    ctx.font = '500 15px system-ui, sans-serif';
+    ctx.fillText('occupied', cx, cy+22);
+  })();
+
+  // ---- Vision alignment 14-day strip ----
+  (function () {
+    const host = document.getElementById('vheat');
+    if (!host) return;
+    const pat = ['yes','yes','partial','yes','no','yes','yes','partial','yes','yes','yes','partial','no','yes'];
+    const colors = { yes:'#D4B476', partial:'#8FA98F', no:'rgba(201,111,90,0.7)', none:'#262832' };
+    const start = 15; // day-of-month label start
+    pat.forEach((v,i)=>{
+      const col = document.createElement('div'); col.className='col';
+      const cell = document.createElement('div'); cell.className='cell';
+      cell.style.background = colors[v];
+      const d = document.createElement('div'); d.className='d'; d.textContent = start+i;
+      col.appendChild(cell); col.appendChild(d); host.appendChild(col);
+    });
+  })();
+</script>

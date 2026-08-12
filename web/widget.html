@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARC 4x8 Widget Preview</title>
+<style>
+  @font-face { font-family: 'Fraunces'; src: url('fonts/fraunces_semibold.ttf'); font-weight: 600; }
+  @font-face { font-family: 'Inter'; src: url('fonts/inter_regular.ttf'); font-weight: 400; }
+  @font-face { font-family: 'Inter'; src: url('fonts/inter_medium.ttf'); font-weight: 500; }
+  @font-face { font-family: 'Inter'; src: url('fonts/inter_semibold.ttf'); font-weight: 600; }
+
+  :root {
+    --ink: #0B0C10; --surface1: #13141A; --surface2: #1A1C23; --hairline: #262832;
+    --ivory: #F2EEE5; --ivory-dim: #9C9CA6; --ivory-faint: #5E5F6A;
+    --gold: #D4B476; --gold-deep: #A88946; --on-gold: #1C1505;
+    --terracotta: #C96F5A; --sage: #8FA98F; --slate: #7C8493;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh; background: #202126 url('') center/cover;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: 'Inter', system-ui, sans-serif; padding: 24px; gap: 18px;
+    background-image: radial-gradient(ellipse at 30% 20%, #2c2e38 0%, #17181d 60%);
+  }
+  .caption { color: var(--ivory-dim); font-size: 13px; letter-spacing: .4px; }
+
+  /* 4x8 widget ≈ full-width, ~2:1 tall on a phone home screen */
+  #widget {
+    width: min(92vw, 372px); aspect-ratio: 1 / 1.9;
+    background: rgba(11,12,16,.92); border: 1px solid rgba(255,255,255,.06);
+    border-radius: 26px; overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 24px 60px rgba(0,0,0,.55);
+  }
+
+  /* ---- top 4x4 : calendar ---- */
+  #calHalf { flex: 1; padding: 16px 16px 10px; display: flex; flex-direction: column; border-bottom: 1px solid var(--hairline); }
+  .w-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .w-month { font-family: 'Fraunces', serif; font-weight: 600; font-size: 19px; color: var(--ivory); }
+  .w-year { font-size: 12px; color: var(--ivory-faint); }
+  .w-app { margin-left: auto; font-size: 9.5px; letter-spacing: 1.8px; color: var(--gold); text-transform: uppercase; }
+  .grid { display: grid; grid-template-columns: repeat(7, 1fr); flex: 1; gap: 1px; }
+  .dow { text-align: center; font-size: 9px; color: var(--ivory-faint); letter-spacing: .8px; align-self: center; }
+  .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 50%; }
+  .cell .n { font-size: 11.5px; font-weight: 500; color: var(--ivory-dim); }
+  .cell.today { background: var(--gold); }
+  .cell.today .n { color: var(--on-gold); font-weight: 600; }
+  .dots { display: flex; gap: 2px; height: 3px; }
+  .dots i { width: 3px; height: 3px; border-radius: 50%; }
+
+  /* ---- bottom 4x4 : today's tasks ---- */
+  #taskHalf { flex: 1; padding: 14px 16px 12px; display: flex; flex-direction: column; overflow: hidden; }
+  .t-label { font-size: 9.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--ivory-faint); margin-bottom: 8px; }
+  .t-label b { color: var(--gold); font-weight: 600; }
+  .t-list { flex: 1; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .t-row { display: flex; align-items: center; gap: 9px; background: var(--surface1); border-radius: 11px; padding: 8px 11px; }
+  .t-ring { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid var(--slate); flex: none;
+            display: flex; align-items: center; justify-content: center; font-size: 9px; color: transparent; }
+  .t-row.done .t-ring { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
+  .t-title { flex: 1; font-size: 12.5px; color: var(--ivory); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t-row.done .t-title { color: var(--ivory-faint); text-decoration: line-through; }
+  .t-time { font-size: 10.5px; font-weight: 600; color: var(--gold); }
+  .t-more { text-align: center; font-size: 10.5px; color: var(--ivory-faint); padding-top: 2px; }
+  .t-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--ivory-faint); font-size: 12px; }
+  .t-empty::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+</style>
+</head>
+<body>
+<div class="caption">Home-screen widget preview — 4×8 (top: calendar · bottom: today)</div>
+<div id="widget">
+  <div id="calHalf">
+    <div class="w-head">
+      <span class="w-month" id="wMonth"></span><span class="w-year" id="wYear"></span>
+      <span class="w-app" style="display:flex;align-items:center;gap:5px">
+        <svg width="13" height="13" viewBox="0 0 64 64" style="flex:none">
+          <path d="M15 41 A17 17 0 0 1 49 41" fill="none" stroke="#D4B476" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="32" cy="23" r="4.5" fill="#D4B476"/>
+          <line x1="13" y1="48" x2="51" y2="48" stroke="#504734" stroke-width="4" stroke-linecap="round"/>
+        </svg>ARC</span>
+    </div>
+    <div class="grid" id="wGrid"></div>
+  </div>
+  <div id="taskHalf">
+    <div class="t-label" id="wLabel">Today</div>
+    <div class="t-list" id="wList"></div>
+  </div>
+</div>
+<div class="caption">Live: shows the same data as the app</div>
+
+<script>
+'use strict';
+const PRI = { URGENT: 'var(--terracotta)', HIGH: 'var(--gold)', MEDIUM: 'var(--sage)', LOW: 'var(--slate)' };
+const tasks = JSON.parse(localStorage.getItem('meridian.tasks') || '[]');
+const now = new Date();
+const pad = n => String(n).padStart(2, '0');
+const today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* calendar */
+document.getElementById('wMonth').textContent = now.toLocaleDateString('en-US', { month: 'long' });
+document.getElementById('wYear').textContent = now.getFullYear();
+const byDay = {};
+for (const t of tasks) if (t.due) (byDay[t.due] = byDay[t.due] || []).push(t);
+
+let g = ['M','T','W','T','F','S','S'].map(d => `<div class="dow">${d}</div>`).join('');
+const first = new Date(now.getFullYear(), now.getMonth(), 1);
+const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+const off = (first.getDay() + 6) % 7;
+for (let i = 0; i < off; i++) g += '<div></div>';
+for (let d = 1; d <= days; d++) {
+  const ds = today.slice(0, 8) + pad(d);
+  const dots = (byDay[ds] || []).slice(0, 3)
+    .map(t => `<i style="background:${ds === today ? 'var(--on-gold)' : (PRI[t.priority] || PRI.MEDIUM)}"></i>`).join('');
+  g += `<div class="cell ${ds === today ? 'today' : ''}"><span class="n">${d}</span><span class="dots">${dots}</span></div>`;
+}
+document.getElementById('wGrid').innerHTML = g;
+
+/* today's tasks */
+const W = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+const dayTasks = tasks
+  .filter(t => t.due && (t.due === today || (t.due < today && !t.done)))
+  .sort((a, b) => (a.done - b.done) || (W[b.priority] || 2) - (W[a.priority] || 2));
+const done = dayTasks.filter(t => t.done).length;
+document.getElementById('wLabel').innerHTML =
+  `Today &nbsp;·&nbsp; <b>${done} of ${dayTasks.length} done</b>`;
+
+const list = document.getElementById('wList');
+if (!dayTasks.length) {
+  list.innerHTML = '<div class="t-empty">A clear day</div>';
+} else {
+  const MAX = 6;
+  list.innerHTML = dayTasks.slice(0, MAX).map(t => `
+    <div class="t-row ${t.done ? 'done' : ''}">
+      <div class="t-ring" style="border-color:${t.done ? '' : (PRI[t.priority] || PRI.MEDIUM)}">✓</div>
+      <div class="t-title">${esc(t.title)}</div>
+      ${t.reminder && !t.done ? `<div class="t-time">${t.reminder}</div>` : ''}
+    </div>`).join('') +
+    (dayTasks.length > MAX ? `<div class="t-more">+ ${dayTasks.length - MAX} more in ARC</div>` : '');
+}
+</script>
+</body>
+</html>
