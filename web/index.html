@@ -413,6 +413,14 @@
     box-sizing: border-box; margin-top: 8px;
   }
   .rp-notes-area:focus { border-color: var(--gold); }
+  .rp-date-input {
+    background: var(--surface2); border: 1px solid var(--hairline); border-radius: 8px;
+    color: var(--ivory); font-size: 12px; font-family: inherit; padding: 6px 8px;
+    outline: none; width: 120px; flex: none; cursor: pointer;
+    color-scheme: dark;
+  }
+  .rp-date-input:focus { border-color: var(--gold); }
+  .rp-target-date { font-size: 11px; color: var(--gold); flex: none; padding: 0 4px; }
   .rp-delete-btn {
     background: none; border: none; color: var(--ivory-faint); font-size: 13px;
     cursor: pointer; padding: 2px 6px;
@@ -2454,17 +2462,29 @@ function closeMeeting() {
 
 /* ---- Research screen ---- */
 function rpItemsHTML(items, type, projId) {
-  let html = items.map((item, i) =>
+  let html = items.map((item) =>
     `<div class="rp-item">
       <div class="rp-check${item.done?' done':''}" data-rptick="${projId}" data-rpitem="${type}" data-rpitemid="${item.id}">✓</div>
       <span class="rp-item-text${item.done?' struck':''}">${esc(item.title)}</span>
+      ${type === 'targets' && item.targetDate
+        ? `<span class="rp-target-date">${fmtDate(item.targetDate, {month:'short', day:'numeric'})}</span>`
+        : ''}
       <button class="rp-delete-btn" data-rpdel="${projId}" data-rpitem="${type}" data-rpitemid="${item.id}">✕</button>
     </div>`).join('');
-  html += `<div class="rp-add-row">
-    <input class="rp-add-input" placeholder="Add ${type === 'tasks' ? 'task' : 'target'}…"
-      data-rpadd="${projId}" data-rpitem="${type}">
-    <button class="rp-add-btn" data-rpaddgo="${projId}" data-rpitem="${type}">+ Add</button>
-  </div>`;
+  if (type === 'targets') {
+    html += `<div class="rp-add-row" style="flex-wrap:wrap;gap:6px">
+      <input class="rp-add-input" placeholder="Add target…" style="flex:1;min-width:100px"
+        data-rpadd="${projId}" data-rpitem="${type}">
+      <input type="date" class="rp-date-input" data-rpdateadd="${projId}" min="${todayStr()}">
+      <button class="rp-add-btn" data-rpaddgo="${projId}" data-rpitem="${type}">+ Add</button>
+    </div>`;
+  } else {
+    html += `<div class="rp-add-row">
+      <input class="rp-add-input" placeholder="Add task…"
+        data-rpadd="${projId}" data-rpitem="${type}">
+      <button class="rp-add-btn" data-rpaddgo="${projId}" data-rpitem="${type}">+ Add</button>
+    </div>`;
+  }
   return html;
 }
 
@@ -2560,7 +2580,11 @@ function rpDeleteItem(projId, type, itemId) {
 function rpAddItem(projId, type, input) {
   const val = input.value.trim(); if (!val) return;
   const proj = research.find(p => p.id === projId); if (!proj) return;
-  proj[type].push({ id: uid(), title: val, done: false });
+  const dateEl = type === 'targets' ? document.querySelector(`[data-rpdateadd="${projId}"]`) : null;
+  const targetDate = dateEl ? dateEl.value : '';
+  const item = { id: uid(), title: val, done: false };
+  if (targetDate) item.targetDate = targetDate;
+  proj[type].push(item);
   expandedProjectId = projId;
   saveResearch(); renderResearch();
 }
