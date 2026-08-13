@@ -3521,10 +3521,10 @@ if ('serviceWorker' in navigator) {
   window.closeMeeting = patchClose(closeMeeting, 'meeting');
   window.closeCalSheet = patchClose(closeCalSheet, 'calSheet');
   window.closeSearch = patchClose(closeSearch, 'search');
-  // briefEl close button is handled inline; patch it too
-  const origStopBrief = stopBrief;
-  window.stopBrief = function() {
-    origStopBrief();
+  // Patch endBrief so closing the brief also pops its history entry
+  const _endBrief = endBrief;
+  window.endBrief = function() {
+    _endBrief();
     if (history.state && history.state.modal === 'brief') history.back();
   };
 
@@ -3560,7 +3560,7 @@ if ('serviceWorker' in navigator) {
       closeMeeting(); return;
     }
     if (briefEl.classList.contains('open')) {
-      stopBrief(); return;
+      endBrief(); return;
     }
 
     // ── Screen navigation ────────────────────────────────────────────────
