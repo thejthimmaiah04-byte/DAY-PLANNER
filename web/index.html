@@ -1432,8 +1432,8 @@ function nowNextWidget() {
   if (!plan.blocks.length) return '';
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const cur  = plan.blocks.find(b => b.start <= nowMin && b.end > nowMin && !b.task.done);
-  const next = plan.blocks.find(b => b.start > nowMin && !b.task.done);
+  const cur  = plan.blocks.find(b => !b.lunch && b.start <= nowMin && b.end > nowMin && !b.task.done);
+  const next = plan.blocks.find(b => !b.lunch && b.start > nowMin && !b.task.done);
   if (!cur && !next) return '';
 
   function col(block, label) {
@@ -1499,7 +1499,7 @@ function notifPermBar() {
 /* ---- Today ---- */
 function renderToday() {
   const plan = planDay(todayStr());
-  const plannedCount = new Set(plan.blocks.map(b => b.task.id)).size;
+  const plannedCount = new Set(plan.blocks.filter(b => !b.lunch).map(b => b.task.id)).size;
   const total = plannedCount + plan.overflow.length + plan.completed.length;
   const pct = total ? Math.round(plan.completed.length / total * 100) : 0;
 
@@ -2405,14 +2405,15 @@ async function newsScript() {
 
 function scheduleScript() {
   const plan = planDay(todayStr());
-  if (!plan.blocks.length && !plan.overflow.length)
+  const taskBlocks = plan.blocks.filter(b => !b.lunch);
+  if (!taskBlocks.length && !plan.overflow.length)
     return 'Your schedule is clear today. A good moment to invest in your two year vision — or simply rest.';
-  const mins = plan.blocks.reduce((s, b) => s + (b.end - b.start), 0);
+  const mins = taskBlocks.reduce((s, b) => s + (b.end - b.start), 0);
   const hours = mins >= 60 ? Math.floor(mins / 60) + (mins % 60 ? ' and a half' : '') + ' hours' : mins + ' minutes';
   const say = m => fmtTime(Math.floor(m / 60), m % 60).replace(':00', " o'clock");
-  let s = 'Now, your day. You have ' + plan.blocks.length +
-    (plan.blocks.length === 1 ? ' task' : ' tasks') + ' planned, about ' + hours + ' of focused effort. ';
-  for (const b of plan.blocks)
+  let s = 'Now, your day. You have ' + taskBlocks.length +
+    (taskBlocks.length === 1 ? ' task' : ' tasks') + ' planned, about ' + hours + ' of focused effort. ';
+  for (const b of taskBlocks)
     s += 'At ' + say(b.start) + ', ' + b.task.title + ' — ' + pri(b.task.priority).label.toLowerCase() +
          ' priority, ' + (b.end - b.start) + ' minutes. ';
   if (plan.overflow.length)
@@ -2900,12 +2901,12 @@ function whatNow() {
   const plan = planDay(todayStr());
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const cur = plan.blocks.find(b => b.start <= nowMin && b.end > nowMin && !b.task.done);
+  const cur = plan.blocks.find(b => !b.lunch && b.start <= nowMin && b.end > nowMin && !b.task.done);
   if (cur) {
     arcModal({ message: `Focus on: "${cur.task.title}"\n${fmtTime(Math.floor(cur.start/60),cur.start%60)} – ${fmtTime(Math.floor(cur.end/60),cur.end%60)}`, buttons:[{label:'Got it',type:'primary',value:null}] });
     return;
   }
-  const next = plan.blocks.find(b => b.start > nowMin && !b.task.done);
+  const next = plan.blocks.find(b => !b.lunch && b.start > nowMin && !b.task.done);
   if (next) {
     const gap = next.start - nowMin;
     arcModal({ message: `Next: "${next.task.title}" at ${fmtTime(Math.floor(next.start/60),next.start%60)}.\nYou have ${gap} min — take a break or do a quick task.`, buttons:[{label:'Got it',type:'primary',value:null}] });
@@ -3307,12 +3308,13 @@ function eveningNudge() {
   if (localStorage.getItem('meridian.eveNotif') === todayStr()) return;
   localStorage.setItem('meridian.eveNotif', todayStr());
   const plan = planDay(todayStr());
-  const total = new Set(plan.blocks.map(b => b.task.id)).size + plan.overflow.length + plan.completed.length;
+  const total = new Set(plan.blocks.filter(b => !b.lunch).map(b => b.task.id)).size + plan.overflow.length + plan.completed.length;
   const d = new Date(); d.setDate(d.getDate() + 1);
   const tplan = planDay(toDateStr(d));
   let body = 'You completed ' + plan.completed.length + ' of ' + total + ' today.';
-  if (tplan.blocks.length) {
-    const b = tplan.blocks[0];
+  const firstTomorrow = tplan.blocks.find(b => !b.lunch);
+  if (firstTomorrow) {
+    const b = firstTomorrow;
     body += ' Tomorrow starts with "' + b.task.title + '" at ' +
       fmtTime(Math.floor(b.start / 60), b.start % 60) + '.';
   }
