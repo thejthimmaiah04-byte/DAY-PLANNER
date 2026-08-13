@@ -350,26 +350,28 @@
 
   /* ---- Research screen ---- */
   .rp-tile {
-    background: var(--surface1); border-radius: 14px;
-    margin-bottom: 10px; overflow: hidden; cursor: pointer;
+    background: var(--surface1); border-radius: 16px;
+    margin-bottom: 12px; overflow: hidden;
   }
+  .rp-tile.open { border: 1.5px solid var(--hairline); }
   .rp-tile-head {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 14px;
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 16px 16px 14px; cursor: pointer;
   }
-  .rp-title { font-size: 15px; font-weight: 600; flex: 1; }
-  .rp-counts {
-    display: flex; gap: 8px; flex: none;
-  }
+  .rp-title-col { flex: 1; min-width: 0; }
+  .rp-title { font-size: 16px; font-weight: 700; display: block; margin-bottom: 6px; }
+  .rp-next { font-size: 12px; color: var(--ivory-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px; }
+  .rp-progress-track { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .rp-progress-fill  { height: 100%; background: var(--gold); border-radius: 2px; transition: width .3s; }
+  .rp-counts { display: flex; gap: 6px; flex: none; flex-direction: column; align-items: flex-end; }
   .rp-count {
     font-size: 11px; color: var(--ivory-faint); background: var(--surface2);
     border-radius: 8px; padding: 2px 8px;
   }
   .rp-chevron {
-    font-size: 12px; color: var(--ivory-faint); transition: transform .2s; flex: none;
+    font-size: 12px; color: var(--ivory-faint); transition: transform .2s; flex: none; margin-top: 2px;
   }
   .rp-tile.open .rp-chevron { transform: rotate(180deg); }
-  .rp-tile.open { border: 1.5px solid var(--hairline); }
   .rp-body {
     display: none; padding: 0 14px 14px; border-top: 1px solid var(--hairline);
   }
@@ -2480,11 +2482,21 @@ function renderResearch() {
       const isOpen = expandedProjectId === proj.id;
       const tDone  = proj.tasks.filter(t=>t.done).length;
       const tgDone = proj.targets.filter(t=>t.done).length;
-      html += `<div class="rp-tile${isOpen?' open':''}" data-rpopen="${proj.id}">
+      const tTotal = proj.tasks.length;
+      const tPct   = tTotal ? Math.round(tDone / tTotal * 100) : 0;
+      const nextTask = proj.tasks.find(t => !t.done);
+      const nextLabel = tTotal === 0 ? 'No tasks yet — tap to add'
+                      : tDone === tTotal ? '✓ All tasks complete'
+                      : `Next: ${nextTask ? nextTask.title : ''}`;
+      html += `<div class="rp-tile${isOpen?' open':''}">
         <div class="rp-tile-head" data-rpopen="${proj.id}">
-          <span class="rp-title" data-rprename="${proj.id}" title="Tap to rename">${esc(proj.title)}</span>
+          <div class="rp-title-col">
+            <span class="rp-title" data-rprename="${proj.id}" title="Tap to rename">${esc(proj.title)}</span>
+            <div class="rp-next">${esc(nextLabel)}</div>
+            <div class="rp-progress-track"><div class="rp-progress-fill" style="width:${tPct}%"></div></div>
+          </div>
           <div class="rp-counts">
-            <span class="rp-count">Tasks ${tDone}/${proj.tasks.length}</span>
+            <span class="rp-count">Tasks ${tDone}/${tTotal}</span>
             <span class="rp-count">Targets ${tgDone}/${proj.targets.length}</span>
           </div>
           <span class="rp-chevron">▾</span>
@@ -2938,9 +2950,9 @@ document.getElementById('view').addEventListener('click', e => {
     return;
   }
 
-  // Research screen: expand/collapse project
-  const rpOpen = e.target.closest('[data-rpopen]');
-  if (rpOpen) {
+  // Research screen: expand/collapse — only fire when clicking the header, not the body
+  const rpOpen = e.target.closest('.rp-tile-head[data-rpopen]');
+  if (rpOpen && !e.target.closest('[data-rprename]')) {
     const id = rpOpen.dataset.rpopen;
     expandedProjectId = expandedProjectId === id ? null : id;
     renderResearch(); return;
