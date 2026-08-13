@@ -225,12 +225,11 @@
   .cal-head .screen-title { padding: 0; flex: 1; }
   .cal-nav { background: none; border: none; color: var(--ivory-dim); font-size: 20px; cursor: pointer; padding: 8px 10px; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-  .cal-span-bar {
-    height: 4px; opacity: 0.5; align-self: end; pointer-events: none;
-    z-index: 2; cursor: default;
-  }
   .cal-dow { text-align: center; font-size: 11px; font-weight: 500; color: var(--ivory-faint); padding: 8px 0; letter-spacing: 1px; }
-  .cal-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; gap: 2px; }
+  .cal-cell-outer { display: flex; flex-direction: column; cursor: pointer; }
+  .cal-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; gap: 2px; }
+  .cal-bar-slot { display: flex; flex-direction: column; gap: 2px; padding: 2px 0 1px; }
+  .cal-bar-inner { height: 3px; opacity: 0.55; pointer-events: none; }
   .cal-cell .n { font-size: 14px; font-weight: 600; }
   .cal-cell.today .n { color: var(--gold); }
   .cal-cell.today { background: var(--surface1); }
@@ -1669,35 +1668,27 @@ function renderCalendar() {
     spanMeta[t.id] = { color: SPAN_PALETTE[i % SPAN_PALETTE.length], lane };
   });
 
-  function dateGridPos(day) {
-    const col = (firstDow + day - 1) % 7 + 1;
-    const row = Math.floor((firstDow + day - 1) / 7) + 2;
-    return { col, row };
-  }
-
   const monthStartStr = calMonth + '-01';
   const monthEndStr   = calMonth + '-' + String(daysInMonth).padStart(2, '0');
-  const spanBars = [];
 
+  // Build per-day bar data (avoids CSS grid explicit/auto-placement conflict)
+  const spansByDay = {};
   for (const t of sortedMulti) {
-    const meta  = spanMeta[t.id];
-    const vS    = t.startDate < monthStartStr ? monthStartStr : t.startDate;
-    const vE    = t.due       > monthEndStr   ? monthEndStr   : t.due;
+    const meta = spanMeta[t.id];
+    const vS = t.startDate < monthStartStr ? monthStartStr : t.startDate;
+    const vE = t.due > monthEndStr ? monthEndStr : t.due;
     if (vS > monthEndStr || vE < monthStartStr) continue;
-    const sd = parseInt(vS.slice(8)), ed = parseInt(vE.slice(8));
-    let d = sd;
-    while (d <= ed) {
-      const { col: c1, row: gr } = dateGridPos(d);
-      let d2 = d;
-      while (d2 < ed && dateGridPos(d2 + 1).row === gr) d2++;
-      const { col: c2 } = dateGridPos(d2);
-      const isStart = d === sd && t.startDate >= monthStartStr;
-      const isEnd   = d2 === ed && t.due <= monthEndStr;
-      const r1 = isStart ? '3px 0 0 3px' : '0';
-      const r2 = isEnd   ? '0 3px 3px 0' : '0';
-      const mb = 3 + meta.lane * 7;
-      spanBars.push(`<div class="cal-span-bar" style="grid-column:${c1}/${c2+1};grid-row:${gr};background:${meta.color};border-radius:${r1} ${r2};margin-bottom:${mb}px" title="${esc(t.title)}"></div>`);
-      d = d2 + 1;
+    const sd2 = parseInt(vS.slice(8)), ed2 = parseInt(vE.slice(8));
+    for (let day = sd2; day <= ed2; day++) {
+      const ds2 = calMonth + '-' + String(day).padStart(2, '0');
+      if (!spansByDay[ds2]) spansByDay[ds2] = [];
+      spansByDay[ds2].push({
+        color: meta.color,
+        lane: meta.lane,
+        isStart: ds2 === t.startDate || (t.startDate < monthStartStr && day === sd2),
+        isEnd:   ds2 === t.due       || (t.due > monthEndStr         && day === ed2),
+        title: t.title
+      });
     }
   }
 
@@ -1722,9 +1713,17 @@ function renderCalendar() {
     const cls = (ds === selectedDate ? 'sel' : ds === todayStr() ? 'today' : '');
     const dots = (byDay[ds] || []).slice(0, 3)
       .map(t => `<i style="background:${ds === selectedDate ? 'var(--on-gold)' : pri(t.priority).color}"></i>`).join('');
-    html += `<div class="cal-cell ${cls}" data-date="${ds}"><span class="n">${d}</span><span class="cal-dots">${dots}</span></div>`;
+    const spansHere = (spansByDay[ds] || []).slice().sort((a, b) => a.lane - b.lane);
+    const barsHtml = spansHere.map(s => {
+      const rL = s.isStart ? '3px' : '0';
+      const rR = s.isEnd   ? '3px' : '0';
+      return `<div class="cal-bar-inner" style="background:${s.color};border-radius:${rL} ${rR} ${rR} ${rL}" title="${esc(s.title)}"></div>`;
+    }).join('');
+    html += `<div class="cal-cell-outer" data-date="${ds}">`;
+    html += `<div class="cal-cell ${cls}"><span class="n">${d}</span><span class="cal-dots">${dots}</span></div>`;
+    if (spansHere.length) html += `<div class="cal-bar-slot">${barsHtml}</div>`;
+    html += `</div>`;
   }
-  html += spanBars.join('');
   html += `</div>`;
 
   const dayTasks = tasks.filter(t =>
@@ -1743,7 +1742,7 @@ function renderCalendar() {
 
   document.getElementById('calPrev').onclick = () => { shiftMonth(-1); };
   document.getElementById('calNext').onclick = () => { shiftMonth(1); };
-  view.querySelectorAll('.cal-cell').forEach(el =>
+  view.querySelectorAll('.cal-cell-outer[data-date]').forEach(el =>
     el.addEventListener('click', () => { selectedDate = el.dataset.date; renderCalendar(); }));
 
   const inlineEmail = document.getElementById('calEmailInline');
