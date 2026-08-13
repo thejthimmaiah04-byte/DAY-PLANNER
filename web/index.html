@@ -87,6 +87,18 @@
     color: var(--ivory-faint); margin: 22px 0 10px;
   }
 
+  /* ---- Lunch break row ---- */
+  .lunch-break-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface1); border-radius: 14px;
+    padding: 10px 14px; margin-bottom: 8px;
+    border: 1px dashed rgba(255,85,0,0.25);
+    opacity: 0.7;
+  }
+  .lunch-icon { font-size: 16px; }
+  .lunch-label { font-size: 14px; font-weight: 600; color: var(--ivory); flex: 1; }
+  .lunch-time { font-size: 12px; color: var(--ivory-faint); }
+
   /* ---- Task rows ---- */
   .task-row {
     display: flex; align-items: center; gap: 12px;
@@ -1157,6 +1169,7 @@ let expandedTaskId = null;
    before work and the evening after it. */
 const DAY_START = 8 * 60, DAY_END = 22 * 60;
 const WORK_START = 9 * 60, WORK_END = 17 * 60;
+const LUNCH_START = 13 * 60, LUNCH_END = 14 * 60;
 
 function planDay(dateStr) {
   const isToday = dateStr === todayStr();
@@ -1175,7 +1188,7 @@ function planDay(dateStr) {
     nowCursor = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15;
   }
 
-  const blocks = [], overflow = [], busy = [];
+  const blocks = [], overflow = [], busy = [[LUNCH_START, LUNCH_END]];
   // Fixed-time appointments anchor first; everything else flows around them
   const fixed = pending.filter(t => t.fixedTime);
   const flex = pending.filter(t => !t.fixedTime);
@@ -1229,6 +1242,8 @@ function planDay(dateStr) {
   fill(byRank(flex.filter(t => t.category !== 'WORK')),
        carve([[DAY_START, WORK_START], [WORK_END, DAY_END]]));
 
+  // Always inject the lunch break as a sentinel so the UI can show it
+  blocks.push({ lunch: true, start: LUNCH_START, end: LUNCH_END });
   blocks.sort((a, b) => a.start - b.start);
   overflow.sort((a, b) => pri(b.priority).weight - pri(a.priority).weight);
   return { blocks, overflow, completed, triage };
@@ -1556,8 +1571,13 @@ function renderToday() {
 
   if (plan.blocks.length) {
     html += `<div class="section-label">Your plan</div>`;
-    for (const b of plan.blocks)
-      html += taskRowHTML(b.task, fmtTime(Math.floor(b.start/60), b.start%60), b.part);
+    for (const b of plan.blocks) {
+      if (b.lunch) {
+        html += `<div class="lunch-break-row"><span class="lunch-icon">🍽</span><span class="lunch-label">Lunch</span><span class="lunch-time">1:00 – 2:00 PM</span></div>`;
+      } else {
+        html += taskRowHTML(b.task, fmtTime(Math.floor(b.start/60), b.start%60), b.part);
+      }
+    }
   }
   if (plan.overflow.length) {
     html += `<div class="section-label">Didn't fit today</div>`;
