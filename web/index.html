@@ -1107,7 +1107,7 @@ async function pullFromSheet() {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-const save = () => { localStorage.setItem('meridian.tasks', JSON.stringify(tasks)); pushToSheet(); scheduleNotifications(); updateAppBadge(); sendPriorityWidget(); };
+const save = () => { localStorage.setItem('meridian.tasks', JSON.stringify(tasks)); pushToSheet(); scheduleNotifications(); updateAppBadge(); };
 
 let vision = Object.assign({ statement: '', target: '', milestones: [] },
   JSON.parse(localStorage.getItem('meridian.vision') || '{}'));
@@ -1489,42 +1489,14 @@ function updateAppBadge() {
   if ('setAppBadge' in navigator) navigator.setAppBadge(count || 0).catch(()=>{});
 }
 
-function sendPriorityWidget() {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  if (!('serviceWorker' in navigator)) return;
-
-  const plan   = planDay(todayStr());
-  const now    = new Date();
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-
-  const curBlock  = plan.blocks.find(b => !b.lunch && b.start <= nowMin && b.end > nowMin && !b.task.done);
-  const nextBlock = plan.blocks.find(b => !b.lunch && b.start > nowMin && !b.task.done);
-  const doneCount = plan.completed.length;
-  const totalCount = new Set(plan.blocks.filter(b => !b.lunch).map(b => b.task.id)).size
-                   + plan.overflow.length + plan.completed.length;
-
-  navigator.serviceWorker.ready.then(reg => {
-    if (reg.active) reg.active.postMessage({
-      type:      'priorityWidget',
-      tasks,
-      today:     todayStr(),
-      nowMin,
-      nowTask:   curBlock  ? { title: curBlock.task.title,  end:   curBlock.end }                                    : null,
-      nextTask:  nextBlock ? { title: nextBlock.task.title, start: nextBlock.start, priority: nextBlock.task.priority } : null,
-      doneCount,
-      totalCount
-    });
-  }).catch(() => {});
-}
-
 function notifPermBar() {
   if (!('Notification' in window) || Notification.permission !== 'default') return '';
-  const hasToday = tasks.some(t => t.due === todayStr() && !t.done);
-  if (!hasToday) return '';
+  const hasTimed = tasks.some(t => t.due === todayStr() && t.fixedTime && !t.done);
+  if (!hasTimed) return '';
   return `<div class="nnw-notif-bar">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-    Enable notifications to see priority tasks in your notification shade — no need to open the app.
-    <button onclick="Notification.requestPermission().then(p=>{if(p==='granted'){scheduleNotifications();sendPriorityWidget();}render()})">Enable</button>
+    Enable notifications to get reminders for today's scheduled tasks.
+    <button onclick="Notification.requestPermission().then(p=>{if(p==='granted'){scheduleNotifications();}render()})">Enable</button>
   </div>`;
 }
 
@@ -3823,7 +3795,6 @@ render();
 pullFromSheet();
 scheduleNotifications();
 updateAppBadge();
-sendPriorityWidget();
 </script>
 </body>
 </html>
