@@ -225,6 +225,10 @@
   .cal-head .screen-title { padding: 0; flex: 1; }
   .cal-nav { background: none; border: none; color: var(--ivory-dim); font-size: 20px; cursor: pointer; padding: 8px 10px; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-span-bar {
+    height: 4px; opacity: 0.5; align-self: end; pointer-events: none;
+    z-index: 2; cursor: default;
+  }
   .cal-dow { text-align: center; font-size: 11px; font-weight: 500; color: var(--ivory-faint); padding: 8px 0; letter-spacing: 1px; }
   .cal-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; gap: 2px; }
   .cal-cell .n { font-size: 14px; font-weight: 600; }
@@ -1680,6 +1684,51 @@ function renderCalendar() {
   const byDay = {};
   for (const t of tasks) if (t.due) (byDay[t.due] = byDay[t.due] || []).push(t);
 
+  // ── Multi-day span bars ──────────────────────────────────────────────────
+  const SPAN_PALETTE = ['#ef4444','#3b82f6','#22c55e','#a855f7','#f59e0b','#06b6d4','#f97316','#ec4899'];
+  const multiDay = tasks.filter(t => t.startDate && t.due && t.startDate < t.due);
+  const sortedMulti = [...multiDay].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const spanMeta = {};
+  const laneEnds = [];
+  sortedMulti.forEach((t, i) => {
+    let lane = laneEnds.findIndex(e => t.startDate > e);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(t.due); }
+    else laneEnds[lane] = t.due;
+    spanMeta[t.id] = { color: SPAN_PALETTE[i % SPAN_PALETTE.length], lane };
+  });
+
+  function dateGridPos(day) {
+    const col = (firstDow + day - 1) % 7 + 1;
+    const row = Math.floor((firstDow + day - 1) / 7) + 2;
+    return { col, row };
+  }
+
+  const monthStartStr = calMonth + '-01';
+  const monthEndStr   = calMonth + '-' + String(daysInMonth).padStart(2, '0');
+  const spanBars = [];
+
+  for (const t of sortedMulti) {
+    const meta  = spanMeta[t.id];
+    const vS    = t.startDate < monthStartStr ? monthStartStr : t.startDate;
+    const vE    = t.due       > monthEndStr   ? monthEndStr   : t.due;
+    if (vS > monthEndStr || vE < monthStartStr) continue;
+    const sd = parseInt(vS.slice(8)), ed = parseInt(vE.slice(8));
+    let d = sd;
+    while (d <= ed) {
+      const { col: c1, row: gr } = dateGridPos(d);
+      let d2 = d;
+      while (d2 < ed && dateGridPos(d2 + 1).row === gr) d2++;
+      const { col: c2 } = dateGridPos(d2);
+      const isStart = d === sd && t.startDate >= monthStartStr;
+      const isEnd   = d2 === ed && t.due <= monthEndStr;
+      const r1 = isStart ? '3px 0 0 3px' : '0';
+      const r2 = isEnd   ? '0 3px 3px 0' : '0';
+      const mb = 3 + meta.lane * 7;
+      spanBars.push(`<div class="cal-span-bar" style="grid-column:${c1}/${c2+1};grid-row:${gr};background:${meta.color};border-radius:${r1} ${r2};margin-bottom:${mb}px" title="${esc(t.title)}"></div>`);
+      d = d2 + 1;
+    }
+  }
+
   const calEmail = prefs.calendarEmail || '';
   let html = `<div class="cal-head">
       <div class="screen-title">${monthName}</div>
@@ -1703,10 +1752,13 @@ function renderCalendar() {
       .map(t => `<i style="background:${ds === selectedDate ? 'var(--on-gold)' : pri(t.priority).color}"></i>`).join('');
     html += `<div class="cal-cell ${cls}" data-date="${ds}"><span class="n">${d}</span><span class="cal-dots">${dots}</span></div>`;
   }
+  html += spanBars.join('');
   html += `</div>`;
 
-  const dayTasks = (byDay[selectedDate] || []).sort((a,b) =>
-    (a.done - b.done) || pri(b.priority).weight - pri(a.priority).weight);
+  const dayTasks = tasks.filter(t =>
+    t.due === selectedDate ||
+    (t.startDate && t.startDate <= selectedDate && t.due >= selectedDate)
+  ).sort((a,b) => (a.done - b.done) || pri(b.priority).weight - pri(a.priority).weight);
   html += `<div class="section-label">${fmtDate(selectedDate, {weekday:'long', month:'long', day:'numeric'})}</div>`;
   if (!dayTasks.length)
     html += `<p style="color:var(--ivory-dim);font-size:13px;padding:10px 0 4px">Nothing scheduled. Tap + to plan this day.</p>`;
@@ -2038,7 +2090,7 @@ function openEditor(task) {
   const t = task || {
     title: '', notes: '', category: screen === 'vision' ? 'VISION' : 'WORK', priority: 'MEDIUM',
     due: screen === 'calendar' ? selectedDate : todayStr(),
-    reminder: null, reminderDate: null, estimate: 30, repeat: '', fixedTime: null, subs: [], milestoneId: null
+    reminder: null, reminderDate: null, estimate: 30, repeat: '', fixedTime: null, startDate: null, subs: [], milestoneId: null
   };
 
   sheet.innerHTML = `
@@ -2074,7 +2126,13 @@ function openEditor(task) {
       ${[15,30,45,60,90,120].map(m => `<button type="button" class="chip ${t.estimate===m?'on':''}" data-v="${m}">${m>=60 ? Math.floor(m/60)+'h'+(m%60? ' '+(m%60)+'m':'') : m+'m'}</button>`).join('')}
     </div>
 
-    <div class="field-label">Due date</div>
+    <div class="field-label">Start date <span style="font-size:11px;color:var(--ivory-dim);font-weight:400">optional — for multi-day events</span></div>
+    <div class="row">
+      <input type="date" id="fStart" value="${t.startDate || ''}">
+      <button type="button" class="chip" id="fClearStart" style="${t.startDate ? '' : 'display:none'}">Clear</button>
+    </div>
+
+    <div class="field-label">End date</div>
     <div class="row">
       <input type="date" id="fDue" value="${t.due || ''}">
       <button type="button" class="chip" id="fClearDue" style="${t.due ? '' : 'display:none'}">Clear</button>
@@ -2155,6 +2213,11 @@ function openEditor(task) {
     if (del) del.closest('.sub-row').remove();
   });
 
+  const fStart = sheet.querySelector('#fStart');
+  const clearStart = sheet.querySelector('#fClearStart');
+  fStart.addEventListener('input', () => { clearStart.style.display = fStart.value ? '' : 'none'; });
+  clearStart.addEventListener('click', () => { fStart.value = ''; clearStart.style.display = 'none'; });
+
   const fDue = sheet.querySelector('#fDue');
   const clearBtn = sheet.querySelector('#fClearDue');
   fDue.addEventListener('input', () => { clearBtn.style.display = fDue.value ? '' : 'none'; });
@@ -2202,6 +2265,7 @@ function openEditor(task) {
       category,
       priority: sheet.querySelector('#fPri .chip.on').dataset.v,
       estimate: Number(sheet.querySelector('#fEst .chip.on').dataset.v),
+      startDate: fStart.value && fDue.value && fStart.value < fDue.value ? fStart.value : null,
       due: fDue.value || null,
       fixedTime: fFixed.value || null,
       repeat: fDue.value ? sheet.querySelector('#fRep .chip.on').dataset.v : '',
