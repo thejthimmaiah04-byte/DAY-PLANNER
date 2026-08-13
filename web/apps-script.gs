@@ -296,3 +296,14 @@ function getCalendarEvents(e) {
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
+
+/* ── One-time authorization helper ───────────────────────────────────────────
+   Run this function ONCE from the Apps Script editor (▶ Run button) to grant
+   Calendar permission. You will see a "Review Permissions" dialog — click
+   through and allow. Then re-deploy the web app as a new version.
+   ────────────────────────────────────────────────────────────────────────── */
+function authorizeCalendar() {
+  const cal = CalendarApp.getDefaultCalendar();
+  Logger.log('✓ Calendar access granted for: ' + cal.getName());
+  Logger.log('You can now re-deploy and use calendar sync in the app.');
+}
