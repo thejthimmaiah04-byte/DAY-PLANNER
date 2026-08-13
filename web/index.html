@@ -1488,8 +1488,28 @@ function updateAppBadge() {
 function sendPriorityWidget() {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   if (!('serviceWorker' in navigator)) return;
+
+  const plan   = planDay(todayStr());
+  const now    = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+
+  const curBlock  = plan.blocks.find(b => !b.lunch && b.start <= nowMin && b.end > nowMin && !b.task.done);
+  const nextBlock = plan.blocks.find(b => !b.lunch && b.start > nowMin && !b.task.done);
+  const doneCount = plan.completed.length;
+  const totalCount = new Set(plan.blocks.filter(b => !b.lunch).map(b => b.task.id)).size
+                   + plan.overflow.length + plan.completed.length;
+
   navigator.serviceWorker.ready.then(reg => {
-    if (reg.active) reg.active.postMessage({ type: 'priorityWidget', tasks, today: todayStr() });
+    if (reg.active) reg.active.postMessage({
+      type:      'priorityWidget',
+      tasks,
+      today:     todayStr(),
+      nowMin,
+      nowTask:   curBlock  ? { title: curBlock.task.title,  end:   curBlock.end }                                    : null,
+      nextTask:  nextBlock ? { title: nextBlock.task.title, start: nextBlock.start, priority: nextBlock.task.priority } : null,
+      doneCount,
+      totalCount
+    });
   }).catch(() => {});
 }
 

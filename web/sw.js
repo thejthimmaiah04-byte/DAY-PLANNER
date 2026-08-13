@@ -47,8 +47,9 @@ self.addEventListener('notificationclick', e => {
 });
 
 async function showPriorityWidget(data) {
-  const today = data.today;
-  const all   = data.tasks || [];
+  const { today, tasks: all = [], nowMin = 0,
+          nowTask, nextTask, doneCount = 0, totalCount = 0 } = data;
+
   const PRI   = { HIGH: 3, MEDIUM: 2, LOW: 1 };
   const EMOJI = { HIGH: '🔴', MEDIUM: '🟡', LOW: '⚪' };
 
@@ -56,33 +57,57 @@ async function showPriorityWidget(data) {
     .filter(t => !t.done && t.due === today)
     .sort((a, b) => (PRI[b.priority] || 0) - (PRI[a.priority] || 0));
 
-  const doneCount = all.filter(t => t.done && t.due === today).length;
-
-  if (!pending.length) {
+  if (!pending.length && !doneCount) {
     const existing = await self.registration.getNotifications({ tag: 'arc-widget' });
     existing.forEach(n => n.close());
-    if (doneCount) {
-      self.registration.showNotification('ARC — All done today 🎉', {
-        body: `${doneCount} task${doneCount > 1 ? 's' : ''} completed. Great work!`,
-        tag: 'arc-widget', icon: '/DAY-PLANNER/web/icon-192.png',
-        badge: '/DAY-PLANNER/web/icon-192.png', silent: true, renotify: false
-      });
-    }
     return;
   }
 
-  const top   = pending.slice(0, 5);
-  const extra = pending.length > 5 ? ` +${pending.length - 5} more` : '';
-  const body  = top.map(t => `${EMOJI[t.priority] || '•'} ${t.title}`).join('\n') + extra;
-  const title = `📋 ${pending.length} pending${doneCount ? ' · ' + doneCount + ' done ✓' : ''}`;
+  if (!pending.length && doneCount) {
+    self.registration.showNotification('ARC — All done today 🎉', {
+      body: `${doneCount} task${doneCount > 1 ? 's' : ''} completed. Great work!`,
+      tag: 'arc-widget', icon: '/DAY-PLANNER/web/icon-192.png',
+      badge: '/DAY-PLANNER/web/icon-192.png', silent: true, renotify: false
+    });
+    return;
+  }
+
+  function fmtMin(m) {
+    const h = Math.floor(m / 60) % 12 || 12;
+    const min = String(m % 60).padStart(2, '0');
+    return `${h}:${min} ${Math.floor(m / 60) >= 12 ? 'PM' : 'AM'}`;
+  }
+
+  // NOW line
+  const nowLine = nowTask ? `NOW  ${nowTask.title}` : 'NOW  Free';
+
+  // NEXT line with countdown
+  let nextLine = 'NEXT  —';
+  if (nextTask) {
+    const gap = nextTask.start - nowMin;
+    const when = gap <= 0 ? 'now' : gap < 60 ? `in ${gap}m` : `at ${fmtMin(nextTask.start)}`;
+    nextLine = `NEXT  ${nextTask.title}  (${when})`;
+  }
+
+  // Progress
+  const pct = totalCount ? Math.round(doneCount / totalCount * 100) : 0;
+  const progressLine = `${doneCount} of ${totalCount} done · ${pct}%`;
+
+  // Priority task list (top 4)
+  const top   = pending.slice(0, 4);
+  const extra = pending.length > 4 ? `\n+${pending.length - 4} more` : '';
+  const taskLines = top.map(t => `${EMOJI[t.priority] || '•'} ${t.title}`).join('\n');
+
+  const title = `ARC · ${progressLine}`;
+  const body  = `${nowLine}\n${nextLine}\n─────\n${taskLines}${extra}`;
 
   self.registration.showNotification(title, {
     body,
-    tag:              'arc-widget',
-    icon:             '/DAY-PLANNER/web/icon-192.png',
-    badge:            '/DAY-PLANNER/web/icon-192.png',
-    silent:           true,
-    renotify:         false,
+    tag:               'arc-widget',
+    icon:              '/DAY-PLANNER/web/icon-192.png',
+    badge:             '/DAY-PLANNER/web/icon-192.png',
+    silent:            true,
+    renotify:          false,
     requireInteraction: false
   });
 }
