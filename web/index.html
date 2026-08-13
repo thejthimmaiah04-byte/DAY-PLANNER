@@ -3375,7 +3375,30 @@ calFetchBtn.addEventListener('click', async () => {
     const url = `${SHEET_URL}?action=calendar&email=${encodeURIComponent(email)}&days=${calDays}&t=${Date.now()}`;
     const res = await fetch(url);
     const d = await res.json();
-    if (d.error) { calList.innerHTML = `<div class="cal-status" style="color:var(--terracotta)">${esc(d.error)}</div>`; return; }
+    if (d.error) {
+      const needsAccess = /not found|permission|does not have access|not.*shared|cannot access/i.test(d.error);
+      calList.innerHTML = `<div class="cal-status" style="color:var(--terracotta)">${esc(d.error)}</div>` +
+        (needsAccess ? `<button class="btn-primary" id="calRequestAccess" style="margin-top:12px;width:100%">📨 Send access request to ${esc(email)}</button>` : '');
+      if (needsAccess) {
+        document.getElementById('calRequestAccess').addEventListener('click', async () => {
+          const btn = document.getElementById('calRequestAccess');
+          btn.disabled = true; btn.textContent = 'Sending…';
+          try {
+            const r = await fetch(`${SHEET_URL}?action=requestAccess&email=${encodeURIComponent(email)}&t=${Date.now()}`);
+            const rd = await r.json();
+            if (rd.ok) {
+              calList.innerHTML = `<div class="cal-status" style="color:#4CAF50">✓ Access request sent to ${esc(email)}.<br>Once they share their calendar with <strong>${esc(rd.scriptEmail||'your Apps Script account')}</strong>, sync will work automatically.</div>`;
+            } else {
+              btn.disabled = false; btn.textContent = '📨 Send access request';
+              calList.insertAdjacentHTML('beforeend', `<div class="cal-status" style="color:var(--terracotta)">${esc(rd.error)}</div>`);
+            }
+          } catch(ex) {
+            btn.disabled = false; btn.textContent = '📨 Send access request';
+          }
+        });
+      }
+      return;
+    }
     calFetchedEvents = d.events || [];
     renderCalEvents();
   } catch (e) {

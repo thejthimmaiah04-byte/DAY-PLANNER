@@ -53,7 +53,10 @@ function clearAndFreeze(sheet, freezeRow) {
 /* ── API entry points ────────────────────────────────────────────────────── */
 
 function doGet(e) {
-  if (e && e.parameter && e.parameter.action === 'calendar') return getCalendarEvents(e);
+  if (e && e.parameter) {
+    if (e.parameter.action === 'calendar')       return getCalendarEvents(e);
+    if (e.parameter.action === 'requestAccess')  return requestCalendarAccess(e);
+  }
   const s = getOrCreate(DATA_SHEET);
   return json({
     tasks:    readCell(s, 'A1') || [],
@@ -295,6 +298,36 @@ function getCalendarEvents(e) {
 
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ── Calendar access request ─────────────────────────────────────────────── */
+
+function requestCalendarAccess(e) {
+  const calEmail   = (e.parameter.email || '').trim();
+  if (!calEmail) return json({ error: 'No email provided.' });
+
+  const scriptEmail = Session.getEffectiveUser().getEmail();
+  const subject     = 'ARC Day Planner — Calendar access request';
+  const body =
+    'Hello,\n\n' +
+    'Your ARC Day Planner app is trying to sync events from the Google Calendar\n' +
+    'associated with this email address (' + calEmail + ').\n\n' +
+    'To grant access, please follow these steps:\n\n' +
+    '  1. Open Google Calendar → calendar.google.com\n' +
+    '  2. On the left sidebar, hover over your calendar and click the three-dot menu → Settings and sharing\n' +
+    '  3. Scroll to "Share with specific people or groups" and click "+ Add people"\n' +
+    '  4. Enter this address: ' + scriptEmail + '\n' +
+    '  5. Set permission to "See all event details"\n' +
+    '  6. Click Send\n\n' +
+    'Once you accept, your ARC app will be able to sync events automatically.\n\n' +
+    '— ARC Day Planner';
+
+  try {
+    MailApp.sendEmail(calEmail, subject, body);
+    return json({ ok: true, scriptEmail: scriptEmail });
+  } catch(err) {
+    return json({ error: err.toString() });
+  }
 }
 
 /* ── One-time authorization helper ───────────────────────────────────────────
