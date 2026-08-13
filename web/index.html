@@ -803,6 +803,33 @@
   .qs-btn:hover { background:var(--surface1); }
   .qs-btn.danger { color:var(--terracotta); }
 
+  /* ---- Now & Next widget ---- */
+  .nnw-card {
+    background: linear-gradient(135deg, rgba(255,85,0,.10) 0%, rgba(255,85,0,.03) 100%);
+    border: 1px solid rgba(255,85,0,.28);
+    border-radius: 18px; padding: 14px 16px; margin-bottom: 12px;
+    display: grid; grid-template-columns: 1fr 1px 1fr; gap: 12px; align-items: center;
+  }
+  .nnw-col { min-width: 0; }
+  .nnw-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 1.8px; color: var(--gold);
+    text-transform: uppercase; display: block; margin-bottom: 5px;
+  }
+  .nnw-name {
+    font-size: 13px; font-weight: 600; color: var(--ivory);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    line-height: 1.35;
+  }
+  .nnw-sub { font-size: 11px; color: var(--ivory-dim); margin-top: 3px; display: block; }
+  .nnw-countdown { font-size: 11px; font-weight: 700; color: var(--gold); margin-top: 3px; display: block; }
+  .nnw-divider { width: 1px; background: rgba(255,85,0,.22); align-self: stretch; margin: 4px 0; }
+  .nnw-free { font-size: 12px; color: var(--ivory-faint); font-style: italic; }
+  .nnw-notif-bar {
+    display: flex; align-items: center; gap: 8px; background: var(--surface2);
+    border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; font-size: 13px; color: var(--ivory-dim);
+  }
+  .nnw-notif-bar button { margin-left:auto; background:var(--gold); border:none; border-radius:8px; color:#fff; font-size:12px; font-weight:600; padding:5px 12px; cursor:pointer; font-family:inherit; }
+
   /* ---- Focus timer ---- */
   .focus-bar { display:flex; align-items:center; gap:10px; background:var(--surface2); border-radius:14px; padding:12px 16px; margin-bottom:10px; border-left:3px solid var(--gold); }
   .focus-task-title { flex:1; font-size:14px; font-weight:500; }
@@ -1064,7 +1091,7 @@ async function pullFromSheet() {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-const save = () => { localStorage.setItem('meridian.tasks', JSON.stringify(tasks)); pushToSheet(); };
+const save = () => { localStorage.setItem('meridian.tasks', JSON.stringify(tasks)); pushToSheet(); scheduleNotifications(); updateAppBadge(); };
 
 let vision = Object.assign({ statement: '', target: '', milestones: [] },
   JSON.parse(localStorage.getItem('meridian.vision') || '{}'));
@@ -1384,6 +1411,76 @@ function focusBarHTML() {
   </div>`;
 }
 
+/* ---- Now & Next widget ---- */
+function nowNextWidget() {
+  const plan = planDay(todayStr());
+  if (!plan.blocks.length) return '';
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const cur  = plan.blocks.find(b => b.start <= nowMin && b.end > nowMin && !b.task.done);
+  const next = plan.blocks.find(b => b.start > nowMin && !b.task.done);
+  if (!cur && !next) return '';
+
+  function col(block, label) {
+    if (!block) return `<div class="nnw-col"><span class="nnw-label">${label}</span><span class="nnw-free">Free</span></div>`;
+    const sh = Math.floor(block.start/60), sm = block.start%60;
+    const eh = Math.floor(block.end/60),   em = block.end%60;
+    return `<div class="nnw-col">
+      <span class="nnw-label">${label}</span>
+      <span class="nnw-name">${esc(block.task.title)}</span>
+      <span class="nnw-sub">${fmtTime(sh,sm)} – ${fmtTime(eh,em)}</span>
+    </div>`;
+  }
+  function countdown(block) {
+    if (!block) return '';
+    const diff = block.start - nowMin;
+    return diff < 60 ? `in ${diff}m` : `in ${Math.floor(diff/60)}h ${diff%60 ? diff%60+'m' : ''}`.trim();
+  }
+
+  const nextCol = next ? `<div class="nnw-col">
+    <span class="nnw-label">Next</span>
+    <span class="nnw-name">${esc(next.task.title)}</span>
+    <span class="nnw-countdown">${countdown(next)}</span>
+  </div>` : `<div class="nnw-col"><span class="nnw-label">Next</span><span class="nnw-free">You're free</span></div>`;
+
+  return `<div class="nnw-card">${col(cur,'Now')}<div class="nnw-divider"></div>${nextCol}</div>`;
+}
+
+/* ---- Notification scheduling (lock-screen reminders) ---- */
+let _notifTimers = [];
+function scheduleNotifications() {
+  _notifTimers.forEach(clearTimeout);
+  _notifTimers = [];
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const today = todayStr(), now = Date.now();
+  tasks.filter(t => t.due === today && !t.done && t.fixedTime).forEach(t => {
+    const [h, m] = t.fixedTime.split(':').map(Number);
+    const startMs = new Date().setHours(h, m, 0, 0);
+    [{ delay: startMs - 10*60*1000 - now, msg: `Coming up in 10 min`, sub: `${t.title} • ${fmtTime(h,m)}` },
+     { delay: startMs - now,              msg: `Starting now`,        sub: t.title }]
+    .filter(n => n.delay > 0)
+    .forEach(n => _notifTimers.push(setTimeout(() => {
+      new Notification(n.msg, { body: n.sub, icon: 'icon-192.png', tag: 'arc-'+t.id, silent: false });
+    }, n.delay)));
+  });
+}
+
+function updateAppBadge() {
+  const count = tasks.filter(t => t.due === todayStr() && !t.done).length;
+  if ('setAppBadge' in navigator) navigator.setAppBadge(count || 0).catch(()=>{});
+}
+
+function notifPermBar() {
+  if (!('Notification' in window) || Notification.permission !== 'default') return '';
+  const hasTimed = tasks.some(t => t.due === todayStr() && t.fixedTime && !t.done);
+  if (!hasTimed) return '';
+  return `<div class="nnw-notif-bar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    Enable notifications to get lock-screen reminders for today's tasks.
+    <button onclick="Notification.requestPermission().then(p=>{if(p==='granted'){scheduleNotifications();}render()})">Enable</button>
+  </div>`;
+}
+
 /* ---- Today ---- */
 function renderToday() {
   const plan = planDay(todayStr());
@@ -1437,6 +1534,8 @@ function renderToday() {
         </button>
       </div>
     </div>
+    ${nowNextWidget()}
+    ${notifPermBar()}
     ${focusBarHTML()}
     ${total > 0 ? retroBar(pct, `${plan.completed.length} of ${total} done`) : '<p style="color:var(--ivory-faint);font-size:13px;padding:4px 0 8px">Ready when you are.</p>'}`;
 
@@ -3590,6 +3689,8 @@ if ('serviceWorker' in navigator) {
 
 render();
 pullFromSheet();
+scheduleNotifications();
+updateAppBadge();
 </script>
 </body>
 </html>
