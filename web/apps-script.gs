@@ -331,12 +331,16 @@ function requestCalendarAccess(e) {
 }
 
 /* ── One-time authorization helper ───────────────────────────────────────────
-   Run this function ONCE from the Apps Script editor (▶ Run button) to grant
-   Calendar permission. You will see a "Review Permissions" dialog — click
-   through and allow. Then re-deploy the web app as a new version.
+   SELECT "authorizeAll" in the function dropdown, then click ▶ Run.
+   Click "Review Permissions" → Allow → then re-deploy as a new version.
+   This grants both Calendar AND Mail permissions in one step.
    ────────────────────────────────────────────────────────────────────────── */
-function authorizeCalendar() {
+function authorizeAll() {
   const cal = CalendarApp.getDefaultCalendar();
-  Logger.log('✓ Calendar access granted for: ' + cal.getName());
-  Logger.log('You can now re-deploy and use calendar sync in the app.');
+  Logger.log('✓ Calendar: ' + cal.getName());
+  MailApp.getRemainingDailyQuota(); // touch MailApp to trigger permission
+  Logger.log('✓ Mail: permission granted. Daily quota: ' + MailApp.getRemainingDailyQuota());
+  Logger.log('Now re-deploy as a new version.');
 }
+
+function authorizeCalendar() { authorizeAll(); }
