@@ -1610,10 +1610,6 @@ function renderToday() {
     html += `<div class="section-label">Didn't fit today</div>`;
     for (const t of plan.overflow) { try { html += taskRowHTML(t); } catch(e) { console.error('taskRowHTML overflow', e); } }
   }
-  if (plan.completed.length) {
-    html += `<div class="section-label">Completed</div>`;
-    for (const t of plan.completed) { try { html += taskRowHTML(t); } catch(e) { console.error('taskRowHTML completed', e); } }
-  }
 
   // Active research tasks: date range covers today, due today, or no date set (always show undated)
   const today2 = todayStr();
@@ -1666,6 +1662,11 @@ function renderToday() {
         </div>
       </div>`;
     });
+  }
+
+  if (plan.completed.length) {
+    html += `<div class="section-label">Completed</div>`;
+    for (const t of plan.completed) { try { html += taskRowHTML(t); } catch(e) { console.error('taskRowHTML completed', e); } }
   }
   html += `<div class="footer-space"></div>`;
   view.innerHTML = html;
