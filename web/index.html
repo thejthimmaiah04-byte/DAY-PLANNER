@@ -3314,15 +3314,13 @@ document.getElementById('view').addEventListener('click', e => {
     addStep.before(inp);
     addStep.style.display = 'none';
     inp.focus();
-    let committed = false;
     const commit = () => {
-      if (committed) return;
-      committed = true;
       const text = inp.value.trim();
+      inp.value = '';
       if (text) { if (!t.subs) t.subs = []; t.subs.push({ text, done: false }); save(); }
       render();
     };
-    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') render(); });
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); commit(); } if (ev.key === 'Escape') render(); });
     inp.addEventListener('blur', commit);
     return;
   }
@@ -3736,7 +3734,15 @@ document.getElementById('sheetUrlInput').addEventListener('change', e => {
 /* ─────────────────────────────────────────────────────────────────────────── */
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const sw = reg.installing;
+      if (!sw) return;
+      sw.addEventListener('statechange', () => {
+        if (sw.state === 'activated') location.reload();
+      });
+    });
+  }).catch(()=>{});
   navigator.serviceWorker.addEventListener('message', e => {
     if (e.data?.type === 'SW_UPDATED') location.reload();
   });
