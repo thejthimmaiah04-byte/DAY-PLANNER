@@ -1629,19 +1629,40 @@ function renderToday() {
   });
   if (activeResearch.length) {
     html += `<div class="section-label">Research · Active Today</div>`;
+    // Build week day strings for streak dots (Mon-Sun of current week)
+    const nowD = new Date();
+    const todayDow2 = (nowD.getDay() + 6) % 7;
+    const weekDays = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(nowD); d.setDate(nowD.getDate() - todayDow2 + i);
+      weekDays.push(toDateStr(d));
+    }
+    const DOW2 = ['M','T','W','T','F','S','S'];
     activeResearch.forEach(({ proj, task: rt }) => {
       let dueLabel = '';
       if (rt.due) {
         const daysLeft = Math.round((new Date(rt.due) - new Date(today2)) / 86400000);
         dueLabel = ' · ' + (daysLeft === 0 ? 'due today' : `${daysLeft}d left`);
       }
-      html += `<div class="task-row research-today-row" data-rptoday="${proj.id}" data-rptodayid="${rt.id}">
-        <div class="tr-left">
-          <div class="tr-check${rt.done?' done':''}" data-rptick="${proj.id}" data-rpitem="tasks" data-rpitemid="${rt.id}">✓</div>
-          <div class="tr-body">
-            <div class="tr-title">${esc(rt.title)}</div>
-            <div class="tr-meta"><span style="color:var(--gold);opacity:0.8">${esc(proj.title)}</span>${dueLabel}</div>
-          </div>
+      // Show streak dots only for multi-day tasks
+      const isMultiDay = rt.startDate && rt.due && rt.startDate < rt.due;
+      const streakDots = isMultiDay ? `<div style="display:flex;gap:5px;margin-top:6px;align-items:center">
+        ${weekDays.map((ds, i) => {
+          const inRange = ds >= rt.startDate && ds <= rt.due;
+          const isToday3 = ds === today2;
+          const color = inRange ? (isToday3 ? 'var(--gold)' : 'rgba(212,180,118,0.45)') : 'var(--hairline)';
+          return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:9px;color:var(--ivory-faint)">${DOW2[i]}</span>
+            <i style="width:7px;height:7px;border-radius:50%;background:${color};display:block"></i>
+          </div>`;
+        }).join('')}
+      </div>` : '';
+      html += `<div class="task-row${rt.done?' is-done':''}">
+        <div class="check${rt.done?' done':''}" data-rptick="${proj.id}" data-rpitem="tasks" data-rpitemid="${rt.id}">✓</div>
+        <div class="task-main">
+          <div class="task-title">${esc(rt.title)}</div>
+          <div class="task-meta"><span style="color:var(--gold);opacity:0.85">${esc(proj.title)}</span>${dueLabel}</div>
+          ${streakDots}
         </div>
       </div>`;
     });
