@@ -1115,6 +1115,7 @@ const saveVision = () => { localStorage.setItem('meridian.vision', JSON.stringif
 let research = JSON.parse(localStorage.getItem('arc.research') || '[]');
 const saveResearch = () => { localStorage.setItem('arc.research', JSON.stringify(research)); pushToSheet(); };
 let expandedProjectId = null;
+let expandedRpTaskId = null;
 let meetingMode = 'work';
 let meetingFeedbackId = null;
 
@@ -2622,7 +2623,7 @@ function mtAddWorkTask(inp) {
 function mtAddRpTask(projId, inp) {
   const val = inp.value.trim(); if (!val) return;
   const proj = research.find(p => p.id === projId); if (!proj) return;
-  proj.tasks.push({ id: uid(), title: val, done: false });
+  proj.tasks.push({ id: uid(), title: val, done: false, notes: '', startDate: null, due: null });
   saveResearch(); renderMeeting();
 }
 
@@ -2640,15 +2641,39 @@ function closeMeeting() {
 
 /* ---- Research screen ---- */
 function rpItemsHTML(items, type, projId) {
-  let html = items.map((item) =>
-    `<div class="rp-item">
+  let html = items.map((item) => {
+    if (type === 'tasks') {
+      const isExp = expandedRpTaskId === item.id;
+      const detail = isExp ? `
+        <div style="width:100%;padding:6px 0 4px 30px">
+          <textarea class="rp-notes-area" placeholder="Task notes…" style="min-height:56px;font-size:13px"
+            data-rptasknotes="${projId}" data-rptaskid="${item.id}">${esc(item.notes||'')}</textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--ivory-faint)">From</span>
+            <input type="date" class="rp-date-input" value="${item.startDate||''}"
+              data-rptaskstart="${projId}" data-rptaskid="${item.id}">
+            <span style="font-size:11px;color:var(--ivory-faint)">To</span>
+            <input type="date" class="rp-date-input" value="${item.due||''}"
+              data-rptaskdue="${projId}" data-rptaskid="${item.id}">
+          </div>
+        </div>` : '';
+      return `<div class="rp-item" style="${isExp?'flex-wrap:wrap;align-items:flex-start;':''}">
+        <div class="rp-check${item.done?' done':''}" data-rptick="${projId}" data-rpitem="${type}" data-rpitemid="${item.id}">✓</div>
+        <span class="rp-item-text${item.done?' struck':''}" style="flex:1">${esc(item.title)}</span>
+        <button class="rp-delete-btn" style="font-size:11px;padding:2px 4px" data-rptaskexp="${item.id}">${isExp?'▴':'▾'}</button>
+        <button class="rp-delete-btn" data-rpdel="${projId}" data-rpitem="${type}" data-rpitemid="${item.id}">✕</button>
+        ${detail}
+      </div>`;
+    }
+    return `<div class="rp-item">
       <div class="rp-check${item.done?' done':''}" data-rptick="${projId}" data-rpitem="${type}" data-rpitemid="${item.id}">✓</div>
       <span class="rp-item-text${item.done?' struck':''}">${esc(item.title)}</span>
       ${type === 'targets' && item.targetDate
         ? `<span class="rp-target-date">${fmtDate(item.targetDate, {month:'short', day:'numeric'})}</span>`
         : ''}
       <button class="rp-delete-btn" data-rpdel="${projId}" data-rpitem="${type}" data-rpitemid="${item.id}">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   if (type === 'targets') {
     html += `<div class="rp-add-row" style="flex-wrap:wrap;gap:6px">
       <input class="rp-add-input" placeholder="Add target…" style="flex:1;min-width:100px"
@@ -2700,6 +2725,8 @@ function renderResearch() {
           <span class="rp-chevron">▾</span>
         </div>
         <div class="rp-body">
+          <div class="rp-section-label">Research Question</div>
+          <textarea class="rp-notes-area" data-rpquestion="${proj.id}" placeholder="What is the core question this research answers?" style="min-height:54px">${esc(proj.question||'')}</textarea>
           <div class="rp-section-label">Tasks</div>
           ${rpItemsHTML(proj.tasks,'tasks',proj.id)}
           <div class="rp-section-label">Targets</div>
@@ -2716,11 +2743,32 @@ function renderResearch() {
   html += `<div class="footer-space"></div>`;
   view.innerHTML = html;
 
-  // Notes auto-save on blur
+  // Project notes + research question auto-save on blur
   view.querySelectorAll('.rp-notes-area').forEach(ta => {
     ta.addEventListener('blur', () => {
-      const proj = research.find(p => p.id === ta.dataset.rpnotes);
-      if (proj) { proj.notes = ta.value; saveResearch(); }
+      if (ta.dataset.rpnotes) {
+        const proj = research.find(p => p.id === ta.dataset.rpnotes);
+        if (proj) { proj.notes = ta.value; saveResearch(); }
+      } else if (ta.dataset.rpquestion) {
+        const proj = research.find(p => p.id === ta.dataset.rpquestion);
+        if (proj) { proj.question = ta.value; saveResearch(); }
+      } else if (ta.dataset.rptasknotes) {
+        const proj = research.find(p => p.id === ta.dataset.rptasknotes);
+        const task = proj && proj.tasks.find(t => t.id === ta.dataset.rptaskid);
+        if (task) { task.notes = ta.value; saveResearch(); }
+      }
+    });
+  });
+
+  // Task date range auto-save on change
+  view.querySelectorAll('[data-rptaskstart],[data-rptaskdue]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const proj = research.find(p => p.id === (inp.dataset.rptaskstart || inp.dataset.rptaskdue));
+      const task = proj && proj.tasks.find(t => t.id === inp.dataset.rptaskid);
+      if (!task) return;
+      if (inp.dataset.rptaskstart !== undefined) task.startDate = inp.value || null;
+      if (inp.dataset.rptaskdue   !== undefined) task.due       = inp.value || null;
+      saveResearch();
     });
   });
 }
@@ -2735,7 +2783,7 @@ async function openResearchEditor() {
     ]
   });
   if (!title) return;
-  research.push({ id: uid(), title, tasks: [], targets: [], notes: '' });
+  research.push({ id: uid(), title, question: '', tasks: [], targets: [], notes: '' });
   saveResearch(); renderResearch();
 }
 
@@ -2760,7 +2808,9 @@ function rpAddItem(projId, type, input) {
   const proj = research.find(p => p.id === projId); if (!proj) return;
   const dateEl = type === 'targets' ? document.querySelector(`[data-rpdateadd="${projId}"]`) : null;
   const targetDate = dateEl ? dateEl.value : '';
-  const item = { id: uid(), title: val, done: false };
+  const item = type === 'tasks'
+    ? { id: uid(), title: val, done: false, notes: '', startDate: null, due: null }
+    : { id: uid(), title: val, done: false };
   if (targetDate) item.targetDate = targetDate;
   proj[type].push(item);
   expandedProjectId = projId;
@@ -3150,6 +3200,15 @@ document.getElementById('view').addEventListener('click', e => {
       if (ev.key === 'Escape') { expandedProjectId = projId; renderResearch(); }
     });
     return;
+  }
+
+  // Research task expand/collapse (notes + dates)
+  const rpTaskExp = e.target.closest('[data-rptaskexp]');
+  if (rpTaskExp) {
+    e.stopPropagation();
+    const id = rpTaskExp.dataset.rptaskexp;
+    expandedRpTaskId = expandedRpTaskId === id ? null : id;
+    renderResearch(); return;
   }
 
   // Research screen: expand/collapse — only fire when clicking the header, not the body
