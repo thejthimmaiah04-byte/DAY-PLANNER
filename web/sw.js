@@ -10,7 +10,12 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  e.waitUntil(
+    caches.keys()
+      .then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => clients.matchAll({ type: 'window', includeUncontrolled: true }))
+      .then(all => all.forEach(c => c.postMessage({ type: 'SW_UPDATED' })))
+  );
   self.clients.claim();
 });
 
