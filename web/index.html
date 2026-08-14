@@ -1793,7 +1793,7 @@ function habitStats() {
     }
     return {
       title: list[list.length - 1].title,
-      repeat: REPEATS.find(r => r.id === list[0].repeat).label,
+      repeat: (REPEATS.find(r => r.id === list[0].repeat) || REPEATS[1]).label,
       streak,
       recent: past.slice(-14)
     };
