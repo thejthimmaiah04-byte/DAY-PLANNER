@@ -1574,17 +1574,22 @@ function renderToday() {
       if (b.lunch) {
         html += `<div class="lunch-break-row"><span class="lunch-icon">🍽</span><span class="lunch-label">Lunch</span><span class="lunch-time">1:00 – 2:00 PM</span></div>`;
       } else {
-        html += taskRowHTML(b.task, fmtTime(Math.floor(b.start/60), b.start%60), b.part);
+        try {
+          html += taskRowHTML(b.task, fmtTime(Math.floor(b.start/60), b.start%60), b.part);
+        } catch(e) {
+          console.error('taskRowHTML failed for', b.task?.title, e);
+          html += `<div style="padding:8px 12px;color:var(--terracotta);font-size:12px">⚠ Could not render: ${esc(b.task?.title||'task')}</div>`;
+        }
       }
     }
   }
   if (plan.overflow.length) {
     html += `<div class="section-label">Didn't fit today</div>`;
-    for (const t of plan.overflow) html += taskRowHTML(t);
+    for (const t of plan.overflow) { try { html += taskRowHTML(t); } catch(e) { console.error('taskRowHTML overflow', e); } }
   }
   if (plan.completed.length) {
     html += `<div class="section-label">Completed</div>`;
-    for (const t of plan.completed) html += taskRowHTML(t);
+    for (const t of plan.completed) { try { html += taskRowHTML(t); } catch(e) { console.error('taskRowHTML completed', e); } }
   }
   html += `<div class="footer-space"></div>`;
   view.innerHTML = html;
