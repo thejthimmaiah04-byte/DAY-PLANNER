@@ -16,10 +16,22 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = e.request.url;
+  // Always bypass cache for external requests
   if (url.includes('script.google.com') || url.includes('version.json') || url.includes('googleapis')) {
     e.respondWith(fetch(e.request).catch(() => new Response('', {status: 503})));
     return;
   }
+  // index.html always network-first so new deployments take effect immediately
+  if (url.endsWith('/') || url.includes('index.html')) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res && res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+  // Everything else: cache-first
   e.respondWith(caches.match(e.request).then(cached => {
     const network = fetch(e.request).then(res => {
       if (res && res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
