@@ -1113,7 +1113,7 @@ let vision = Object.assign({ statement: '', target: '', milestones: [] },
 const saveVision = () => { localStorage.setItem('meridian.vision', JSON.stringify(vision)); pushToSheet(); };
 
 let research = JSON.parse(localStorage.getItem('arc.research') || '[]');
-const saveResearch = () => { localStorage.setItem('arc.research', JSON.stringify(research)); pushToSheet(); };
+const saveResearch = () => { localStorage.setItem('arc.research', JSON.stringify(research)); pushToSheet(); scheduleNotifications(); };
 let expandedProjectId = null;
 let expandedRpTaskId = null;
 let meetingMode = 'work';
@@ -1472,6 +1472,8 @@ function scheduleNotifications() {
   _notifTimers = [];
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const today = todayStr(), now = Date.now();
+
+  // Timed task reminders (10 min warning + start)
   tasks.filter(t => t.due === today && !t.done && t.fixedTime).forEach(t => {
     const [h, m] = t.fixedTime.split(':').map(Number);
     const startMs = new Date().setHours(h, m, 0, 0);
@@ -1481,6 +1483,27 @@ function scheduleNotifications() {
     .forEach(n => _notifTimers.push(setTimeout(() => {
       new Notification(n.msg, { body: n.sub, icon: 'icon-192.png', tag: 'arc-'+t.id, silent: false });
     }, n.delay)));
+  });
+
+  // Daily research task reminders (fires at the set time if task is active today)
+  research.forEach(proj => {
+    proj.tasks.forEach(rt => {
+      if (rt.done || !rt.reminder || !rt.startDate || !rt.due) return;
+      if (rt.startDate > today || rt.due < today) return;
+      const [h, m] = rt.reminder.split(':').map(Number);
+      const fireMs = new Date().setHours(h, m, 0, 0);
+      const delay = fireMs - now;
+      if (delay > 0) {
+        _notifTimers.push(setTimeout(() => {
+          new Notification('Research reminder', {
+            body: `${rt.title} · ${proj.title}`,
+            icon: 'icon-192.png',
+            tag: 'arc-rp-' + rt.id,
+            silent: false
+          });
+        }, delay));
+      }
+    });
   });
 }
 
@@ -1590,6 +1613,33 @@ function renderToday() {
   if (plan.completed.length) {
     html += `<div class="section-label">Completed</div>`;
     for (const t of plan.completed) { try { html += taskRowHTML(t); } catch(e) { console.error('taskRowHTML completed', e); } }
+  }
+
+  // Active research tasks (startDate ≤ today ≤ due)
+  const today2 = todayStr();
+  const activeResearch = [];
+  research.forEach(proj => {
+    proj.tasks.forEach(rt => {
+      if (!rt.done && rt.startDate && rt.due && rt.startDate <= today2 && rt.due >= today2) {
+        activeResearch.push({ proj, task: rt });
+      }
+    });
+  });
+  if (activeResearch.length) {
+    html += `<div class="section-label">Research · Active Today</div>`;
+    activeResearch.forEach(({ proj, task: rt }) => {
+      const daysLeft = Math.round((new Date(rt.due) - new Date(today2)) / 86400000);
+      const dueLabel = daysLeft === 0 ? 'due today' : `${daysLeft}d left`;
+      html += `<div class="task-row research-today-row" data-rptoday="${proj.id}" data-rptodayid="${rt.id}">
+        <div class="tr-left">
+          <div class="tr-check${rt.done?' done':''}" data-rptick="${proj.id}" data-rpitem="tasks" data-rpitemid="${rt.id}">✓</div>
+          <div class="tr-body">
+            <div class="tr-title">${esc(rt.title)}</div>
+            <div class="tr-meta"><span style="color:var(--gold);opacity:0.8">${esc(proj.title)}</span> · ${dueLabel}</div>
+          </div>
+        </div>
+      </div>`;
+    });
   }
   html += `<div class="footer-space"></div>`;
   view.innerHTML = html;
@@ -2628,7 +2678,7 @@ function mtAddWorkTask(inp) {
 function mtAddRpTask(projId, inp) {
   const val = inp.value.trim(); if (!val) return;
   const proj = research.find(p => p.id === projId); if (!proj) return;
-  proj.tasks.push({ id: uid(), title: val, done: false, notes: '', startDate: null, due: null });
+  proj.tasks.push({ id: uid(), title: val, done: false, notes: '', startDate: null, due: null, reminder: null });
   saveResearch(); renderMeeting();
 }
 
@@ -2660,6 +2710,13 @@ function rpItemsHTML(items, type, projId) {
             <span style="font-size:11px;color:var(--ivory-faint)">To</span>
             <input type="date" class="rp-date-input" value="${item.due||''}"
               data-rptaskdue="${projId}" data-rptaskid="${item.id}">
+          </div>
+          <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+            <span style="font-size:11px;color:var(--ivory-faint)">Daily reminder</span>
+            <input type="time" class="rp-date-input" value="${item.reminder||''}"
+              data-rptaskreminder="${projId}" data-rptaskid="${item.id}"
+              style="width:110px" placeholder="--:--">
+            ${item.reminder ? `<span style="font-size:11px;color:var(--gold)">🔔 ${item.reminder}</span>` : ''}
           </div>
         </div>` : '';
       return `<div class="rp-item" style="${isExp?'flex-wrap:wrap;align-items:flex-start;':''}">
@@ -2766,13 +2823,15 @@ function renderResearch() {
   });
 
   // Task date range auto-save on change
-  view.querySelectorAll('[data-rptaskstart],[data-rptaskdue]').forEach(inp => {
+  view.querySelectorAll('[data-rptaskstart],[data-rptaskdue],[data-rptaskreminder]').forEach(inp => {
     inp.addEventListener('change', () => {
-      const proj = research.find(p => p.id === (inp.dataset.rptaskstart || inp.dataset.rptaskdue));
+      const projId = inp.dataset.rptaskstart || inp.dataset.rptaskdue || inp.dataset.rptaskreminder;
+      const proj = research.find(p => p.id === projId);
       const task = proj && proj.tasks.find(t => t.id === inp.dataset.rptaskid);
       if (!task) return;
-      if (inp.dataset.rptaskstart !== undefined) task.startDate = inp.value || null;
-      if (inp.dataset.rptaskdue   !== undefined) task.due       = inp.value || null;
+      if (inp.dataset.rptaskstart    !== undefined) task.startDate = inp.value || null;
+      if (inp.dataset.rptaskdue      !== undefined) task.due       = inp.value || null;
+      if (inp.dataset.rptaskreminder !== undefined) { task.reminder = inp.value || null; scheduleNotifications(); }
       saveResearch();
     });
   });
@@ -2799,6 +2858,7 @@ function rpToggleItem(projId, type, itemId) {
   item.done = !item.done;
   saveResearch();
   if (screen === 'research') renderResearch();
+  else if (screen === 'today') renderToday();
   else renderMeeting();
 }
 
@@ -2814,7 +2874,7 @@ function rpAddItem(projId, type, input) {
   const dateEl = type === 'targets' ? document.querySelector(`[data-rpdateadd="${projId}"]`) : null;
   const targetDate = dateEl ? dateEl.value : '';
   const item = type === 'tasks'
-    ? { id: uid(), title: val, done: false, notes: '', startDate: null, due: null }
+    ? { id: uid(), title: val, done: false, notes: '', startDate: null, due: null, reminder: null }
     : { id: uid(), title: val, done: false };
   if (targetDate) item.targetDate = targetDate;
   proj[type].push(item);
