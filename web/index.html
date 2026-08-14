@@ -1615,27 +1615,32 @@ function renderToday() {
     for (const t of plan.completed) { try { html += taskRowHTML(t); } catch(e) { console.error('taskRowHTML completed', e); } }
   }
 
-  // Active research tasks (startDate ≤ today ≤ due)
+  // Active research tasks: date range covers today, due today, or no date set (always show undated)
   const today2 = todayStr();
   const activeResearch = [];
   research.forEach(proj => {
     proj.tasks.forEach(rt => {
-      if (!rt.done && rt.startDate && rt.due && rt.startDate <= today2 && rt.due >= today2) {
-        activeResearch.push({ proj, task: rt });
-      }
+      if (rt.done) return;
+      const inRange = rt.startDate && rt.due && rt.startDate <= today2 && rt.due >= today2;
+      const dueToday = !rt.startDate && rt.due && rt.due === today2;
+      const undated  = !rt.startDate && !rt.due;
+      if (inRange || dueToday || undated) activeResearch.push({ proj, task: rt });
     });
   });
   if (activeResearch.length) {
     html += `<div class="section-label">Research · Active Today</div>`;
     activeResearch.forEach(({ proj, task: rt }) => {
-      const daysLeft = Math.round((new Date(rt.due) - new Date(today2)) / 86400000);
-      const dueLabel = daysLeft === 0 ? 'due today' : `${daysLeft}d left`;
+      let dueLabel = '';
+      if (rt.due) {
+        const daysLeft = Math.round((new Date(rt.due) - new Date(today2)) / 86400000);
+        dueLabel = ' · ' + (daysLeft === 0 ? 'due today' : `${daysLeft}d left`);
+      }
       html += `<div class="task-row research-today-row" data-rptoday="${proj.id}" data-rptodayid="${rt.id}">
         <div class="tr-left">
           <div class="tr-check${rt.done?' done':''}" data-rptick="${proj.id}" data-rpitem="tasks" data-rpitemid="${rt.id}">✓</div>
           <div class="tr-body">
             <div class="tr-title">${esc(rt.title)}</div>
-            <div class="tr-meta"><span style="color:var(--gold);opacity:0.8">${esc(proj.title)}</span> · ${dueLabel}</div>
+            <div class="tr-meta"><span style="color:var(--gold);opacity:0.8">${esc(proj.title)}</span>${dueLabel}</div>
           </div>
         </div>
       </div>`;
