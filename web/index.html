@@ -1349,7 +1349,7 @@ function taskRowHTML(t, timeLabel, part) {
         return `<div class="habit-day"><span class="habit-dow">${lbl}</span><div class="habit-circle ${cls}">${s.done ? '✓' : ''}</div></div>`;
       }).join('');
       habitHTML = `<div class="habit-strip">
-        <div class="habit-streak-label">🔥 ${hw.streak} day streak · ↻ ${REPEATS.find(r => r.id === t.repeat).label}</div>
+        <div class="habit-streak-label">🔥 ${hw.streak} day streak · ↻ ${(REPEATS.find(r => r.id === t.repeat) || REPEATS[1]).label}</div>
         <div class="habit-week">${dots}</div>
       </div>`;
     }
@@ -3373,12 +3373,22 @@ nav.addEventListener('click', e => {
 });
 
 function render() {
-  if (screen === 'today') renderToday();
-  else if (screen === 'tasks') renderTasks();
-  else if (screen === 'calendar') renderCalendar();
-  else if (screen === 'vision') renderVision();
-  else if (screen === 'research') renderResearch();
-  else renderStats();
+  try {
+    if (screen === 'today') renderToday();
+    else if (screen === 'tasks') renderTasks();
+    else if (screen === 'calendar') renderCalendar();
+    else if (screen === 'vision') renderVision();
+    else if (screen === 'research') renderResearch();
+    else renderStats();
+  } catch (err) {
+    const view = document.getElementById('view');
+    if (view) view.innerHTML = `<div style="padding:20px 16px">
+      <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px">Render error — please report this</div>
+      <pre style="font-size:11px;color:var(--ivory-faint);white-space:pre-wrap;word-break:break-all">${esc(String(err?.stack || err))}</pre>
+      <button onclick="render()" style="margin-top:12px;padding:8px 16px;background:var(--gold);color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer">Retry</button>
+    </div>`;
+    console.error('render() crashed:', err);
+  }
 }
 
 /* ================= Reminders (while app is open) ================= */
