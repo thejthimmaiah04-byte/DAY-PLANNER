@@ -1640,16 +1640,27 @@ function renderToday() {
         const daysLeft = Math.round((new Date(rt.due) - new Date(today2)) / 86400000);
         dueLabel = ' · ' + (daysLeft === 0 ? 'due today' : `${daysLeft}d left`);
       }
-      // Show streak dots only for multi-day tasks
+      // Show streak dots only for multi-day tasks; dots are tappable to mark a day done
       const isMultiDay = rt.startDate && rt.due && rt.startDate < rt.due;
-      const streakDots = isMultiDay ? `<div style="display:flex;gap:5px;margin-top:6px;align-items:center">
+      const doneDays = Array.isArray(rt.completedDays) ? rt.completedDays : [];
+      const streakDots = isMultiDay ? `<div style="display:flex;gap:8px;margin-top:7px;align-items:flex-end">
         ${weekDays.map((ds, i) => {
           const inRange = ds >= rt.startDate && ds <= rt.due;
+          const isDone  = doneDays.includes(ds);
           const isToday3 = ds === today2;
-          const color = inRange ? (isToday3 ? 'var(--gold)' : 'rgba(212,180,118,0.45)') : 'var(--hairline)';
-          return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-            <span style="font-size:9px;color:var(--ivory-faint)">${DOW2[i]}</span>
-            <i style="width:7px;height:7px;border-radius:50%;background:${color};display:block"></i>
+          const isPast  = ds < today2;
+          let bg, border, size;
+          if (!inRange)       { bg = 'var(--hairline)'; border = 'none'; size = '7px'; }
+          else if (isDone)    { bg = 'var(--gold)'; border = 'none'; size = '10px'; }
+          else if (isToday3)  { bg = 'transparent'; border = '2px solid var(--gold)'; size = '10px'; }
+          else if (isPast)    { bg = 'rgba(212,180,118,0.2)'; border = '1.5px solid rgba(212,180,118,0.4)'; size = '10px'; }
+          else                { bg = 'rgba(212,180,118,0.15)'; border = 'none'; size = '9px'; }
+          const tap = inRange ? `data-rpdaytick="${proj.id}" data-rpdaytickid="${rt.id}" data-rpdaytickdate="${ds}"` : '';
+          return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;${inRange?'cursor:pointer':''}">
+            <span style="font-size:9px;color:${inRange?'var(--ivory-dim)':'var(--hairline)'}">${DOW2[i]}</span>
+            <div ${tap} style="width:${size};height:${size};border-radius:50%;background:${bg};border:${border};box-sizing:border-box;${isDone?'display:flex;align-items:center;justify-content:center;font-size:7px;color:#000':''}">
+              ${isDone ? '✓' : ''}
+            </div>
           </div>`;
         }).join('')}
       </div>` : '';
@@ -2722,7 +2733,7 @@ function mtAddWorkTask(inp) {
 function mtAddRpTask(projId, inp) {
   const val = inp.value.trim(); if (!val) return;
   const proj = research.find(p => p.id === projId); if (!proj) return;
-  proj.tasks.push({ id: uid(), title: val, done: false, notes: '', startDate: null, due: null, reminder: null });
+  proj.tasks.push({ id: uid(), title: val, done: false, notes: '', startDate: null, due: null, reminder: null, completedDays: [] });
   saveResearch(); renderMeeting();
 }
 
@@ -2918,7 +2929,7 @@ function rpAddItem(projId, type, input) {
   const dateEl = type === 'targets' ? document.querySelector(`[data-rpdateadd="${projId}"]`) : null;
   const targetDate = dateEl ? dateEl.value : '';
   const item = type === 'tasks'
-    ? { id: uid(), title: val, done: false, notes: '', startDate: null, due: null, reminder: null }
+    ? { id: uid(), title: val, done: false, notes: '', startDate: null, due: null, reminder: null, completedDays: [] }
     : { id: uid(), title: val, done: false };
   if (targetDate) item.targetDate = targetDate;
   proj[type].push(item);
@@ -3326,6 +3337,21 @@ document.getElementById('view').addEventListener('click', e => {
     const id = rpOpen.dataset.rpopen;
     expandedProjectId = expandedProjectId === id ? null : id;
     renderResearch(); return;
+  }
+
+  // Research: tick individual day dot on multi-day task
+  const rpDayTick = e.target.closest('[data-rpdaytick]');
+  if (rpDayTick) {
+    const proj = research.find(p => p.id === rpDayTick.dataset.rpdaytick);
+    const task = proj && proj.tasks.find(t => t.id === rpDayTick.dataset.rpdaytickid);
+    if (task) {
+      if (!Array.isArray(task.completedDays)) task.completedDays = [];
+      const date = rpDayTick.dataset.rpdaytickdate;
+      const idx = task.completedDays.indexOf(date);
+      if (idx === -1) task.completedDays.push(date); else task.completedDays.splice(idx, 1);
+      saveResearch(); renderToday();
+    }
+    return;
   }
 
   // Research: tick task/target
