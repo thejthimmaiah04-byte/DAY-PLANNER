@@ -1945,6 +1945,23 @@ function renderStats() {
         </div>`;
       }).join('')}
     </div>
+    ${research.length ? `
+    <div class="section-label">Research progress</div>
+    <div class="panel">
+      ${research.map(proj => {
+        const total = proj.tasks.length;
+        const done  = proj.tasks.filter(t => t.done).length;
+        const pct   = total ? Math.round(done / total * 100) : 0;
+        const active = proj.tasks.filter(t => !t.done && t.startDate && t.due && t.startDate <= todayStr() && t.due >= todayStr()).length;
+        return `<div class="cat-row" style="cursor:pointer" onclick="screen='research';render()">
+          <div class="cat-top">
+            <span class="pdot" style="background:var(--gold)"></span>${esc(proj.title)}
+            <span class="count">${done} / ${total} tasks${active ? ` · <span style="color:var(--gold)">${active} active</span>` : ''}</span>
+          </div>
+          <div class="cat-track"><div class="cat-fill" style="width:${pct}%;background:var(--gold)"></div></div>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
     <div class="section-label">Your data</div>
     <div class="data-btns">
       <button type="button" class="data-btn" id="btnExport">⬇ Export backup</button>
