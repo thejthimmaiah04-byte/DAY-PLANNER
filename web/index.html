@@ -3250,7 +3250,10 @@ document.getElementById('view').addEventListener('click', e => {
     addStep.before(inp);
     addStep.style.display = 'none';
     inp.focus();
+    let committed = false;
     const commit = () => {
+      if (committed) return;
+      committed = true;
       const text = inp.value.trim();
       if (text) { if (!t.subs) t.subs = []; t.subs.push({ text, done: false }); save(); }
       render();
