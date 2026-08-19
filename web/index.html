@@ -998,8 +998,10 @@ const pri = id => PRIORITIES.find(p => p.id === id) || PRIORITIES[2];
 
 // Notification helper — Android PWA forbids new Notification(); must use SW registration
 function showNotif(title, options) {
-  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options || {})).catch(() => {});
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready
+      .then(reg => reg.showNotification(title, options || {}))
+      .catch(() => { try { new Notification(title, options); } catch(e) {} });
   } else {
     try { new Notification(title, options); } catch(e) {}
   }
@@ -1435,7 +1437,7 @@ function startFocus(taskId, minutes) {
     if (focusSeconds <= 0) {
       clearInterval(focusInterval);
       focusTaskId = null;
-      if (Notification.permission === 'granted') new Notification('Focus session done! Take a break.', { tag: 'arc-focus' });
+      if (Notification.permission === 'granted') showNotif('Focus session done! Take a break.', { icon: 'icon-192.png', tag: 'arc-focus' });
       render(); return;
     }
     focusSeconds--;
@@ -3721,8 +3723,8 @@ function morningNudge() {
     tag: 'meridian-morning'
   });
 }
-setInterval(morningNudge, 30000);
-morningNudge();
+setInterval(() => { try { morningNudge(); } catch(e) {} }, 30000);
+try { morningNudge(); } catch(e) {}
 
 /* 21:00 wind-down: close today's loop, preview tomorrow's first block */
 function eveningNudge() {
@@ -3742,11 +3744,10 @@ function eveningNudge() {
     body += ' Tomorrow starts with "' + b.task.title + '" at ' +
       fmtTime(Math.floor(b.start / 60), b.start % 60) + '.';
   }
-  const n = new Notification('Winding down 🌙', { body, tag: 'meridian-evening' });
-  n.onclick = () => { window.focus(); n.close(); };
+  showNotif('Winding down 🌙', { body, icon: 'icon-192.png', tag: 'meridian-evening' });
 }
-setInterval(eveningNudge, 30000);
-eveningNudge();
+setInterval(() => { try { eveningNudge(); } catch(e) {} }, 30000);
+try { eveningNudge(); } catch(e) {}
 
 /* ================= Calendar Sync ================= */
 let calFetchedEvents = [];
