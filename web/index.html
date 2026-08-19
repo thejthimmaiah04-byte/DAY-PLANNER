@@ -2019,6 +2019,8 @@ function renderStats() {
 }
 
 /* ---- Feedback ---- */
+let activeFbId = null; // which entry has the add-point input open
+
 function renderFeedback() {
   const sorted = [...feedbackEntries].sort((a, b) => b.createdAt - a.createdAt);
   let html = `<div class="screen-title">Feedback</div>`;
@@ -2030,7 +2032,22 @@ function renderFeedback() {
     sorted.forEach(fb => {
       const d = new Date(fb.createdAt);
       const dateStr = d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
-      html += `<div class="panel" style="margin-bottom:12px;position:relative">
+      // Support both old text field and new points array
+      const points = Array.isArray(fb.points) ? fb.points
+        : (fb.text ? fb.text.split('\n').filter(Boolean) : []);
+      const pointsHtml = points.map((p, i) =>
+        `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--hairline)">
+          <span style="color:var(--gold);font-size:13px;margin-top:1px;flex:none">•</span>
+          <span style="font-size:14px;color:var(--ivory-dim);line-height:1.55;flex:1">${esc(p)}</span>
+          <button class="rp-delete-btn" data-fbdpt="${fb.id}" data-fbdptidx="${i}" style="padding:1px 5px;font-size:10px">✕</button>
+        </div>`).join('');
+      const addRow = activeFbId === fb.id
+        ? `<div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <input id="fbPtInp_${fb.id}" class="rp-add-input" placeholder="Add a point…" style="flex:1" autofocus>
+            <button class="rp-add-btn" data-fbptadd="${fb.id}">Add</button>
+          </div>`
+        : `<button style="margin-top:8px;font-size:12px;color:var(--gold);background:none;border:none;cursor:pointer;padding:0" data-fbptopen="${fb.id}">+ Add point</button>`;
+      html += `<div class="panel" style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <div>
             <div style="font-size:15px;font-weight:600;color:var(--ivory)">${esc(fb.person)}</div>
@@ -2041,18 +2058,60 @@ function renderFeedback() {
             <button class="rp-delete-btn" data-fbdel="${fb.id}" style="padding:2px 6px">✕</button>
           </div>
         </div>
-        <div style="font-size:14px;color:var(--ivory-dim);line-height:1.65;white-space:pre-wrap">${esc(fb.text)}</div>
+        ${pointsHtml}
+        ${addRow}
       </div>`;
     });
   }
   html += `<div class="footer-space"></div>`;
   view.innerHTML = html;
+
+  // Delete whole entry
   view.querySelectorAll('[data-fbdel]').forEach(btn => {
     btn.addEventListener('click', () => {
       feedbackEntries = feedbackEntries.filter(f => f.id !== btn.dataset.fbdel);
+      if (activeFbId === btn.dataset.fbdel) activeFbId = null;
       saveFeedback(); renderFeedback();
     });
   });
+
+  // Delete single point
+  view.querySelectorAll('[data-fbdpt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const fb = feedbackEntries.find(f => f.id === btn.dataset.fbdpt); if (!fb) return;
+      if (!Array.isArray(fb.points)) fb.points = (fb.text||'').split('\n').filter(Boolean);
+      fb.points.splice(Number(btn.dataset.fbdptidx), 1);
+      saveFeedback(); renderFeedback();
+    });
+  });
+
+  // Open add-point input
+  view.querySelectorAll('[data-fbptopen]').forEach(btn => {
+    btn.addEventListener('click', () => { activeFbId = btn.dataset.fbptopen; renderFeedback(); });
+  });
+
+  // Add a point
+  const addPoint = (fbId) => {
+    const inp = document.getElementById(`fbPtInp_${fbId}`); if (!inp) return;
+    const val = inp.value.trim(); if (!val) { activeFbId = null; renderFeedback(); return; }
+    const fb = feedbackEntries.find(f => f.id === fbId); if (!fb) return;
+    if (!Array.isArray(fb.points)) fb.points = (fb.text||'').split('\n').filter(Boolean);
+    fb.points.push(val);
+    saveFeedback(); renderFeedback();
+  };
+  view.querySelectorAll('[data-fbptadd]').forEach(btn => {
+    btn.addEventListener('click', () => addPoint(btn.dataset.fbptadd));
+  });
+  if (activeFbId) {
+    const inp = document.getElementById(`fbPtInp_${activeFbId}`);
+    if (inp) {
+      inp.focus();
+      inp.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') { ev.preventDefault(); addPoint(activeFbId); }
+        if (ev.key === 'Escape') { activeFbId = null; renderFeedback(); }
+      });
+    }
+  }
 }
 
 async function openFeedbackEditor() {
@@ -2068,13 +2127,9 @@ async function openFeedbackEditor() {
     buttons: [{ label: 'Skip', type: 'secondary', value: '' }, { label: 'Next', type: 'primary' }]
   });
   if (role === null) return;
-  const text = await arcModal({
-    message: 'What was the feedback?',
-    input: true, placeholder: 'Write the feedback here…',
-    buttons: [{ label: 'Cancel', type: 'secondary', value: null }, { label: 'Save', type: 'primary' }]
-  });
-  if (!text) return;
-  feedbackEntries.push({ id: uid(), person, role: role || '', text, createdAt: Date.now() });
+  const newId = uid();
+  feedbackEntries.push({ id: newId, person, role: role || '', points: [], createdAt: Date.now() });
+  activeFbId = newId;
   saveFeedback(); renderFeedback();
 }
 
