@@ -996,6 +996,15 @@ const REPEATS = [
 const cat = id => CATEGORIES.find(c => c.id === id) || CATEGORIES[0];
 const pri = id => PRIORITIES.find(p => p.id === id) || PRIORITIES[2];
 
+// Notification helper — Android PWA forbids new Notification(); must use SW registration
+function showNotif(title, options) {
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options || {})).catch(() => {});
+  } else {
+    try { new Notification(title, options); } catch(e) {}
+  }
+}
+
 // Safe localStorage JSON reader — corrupt data returns the fallback instead of crashing the app
 function safeJSON(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -1502,7 +1511,7 @@ function scheduleNotifications() {
      { delay: startMs - now,              msg: `Starting now`,        sub: t.title }]
     .filter(n => n.delay > 0)
     .forEach(n => _notifTimers.push(setTimeout(() => {
-      new Notification(n.msg, { body: n.sub, icon: 'icon-192.png', tag: 'arc-'+t.id, silent: false });
+      showNotif(n.msg, { body: n.sub, icon: 'icon-192.png', tag: 'arc-'+t.id, silent: false });
     }, n.delay)));
   });
 
@@ -1516,7 +1525,7 @@ function scheduleNotifications() {
       const delay = fireMs - now;
       if (delay > 0) {
         _notifTimers.push(setTimeout(() => {
-          new Notification('Research reminder', {
+          showNotif('Research reminder', {
             body: `${rt.title} · ${proj.title}`,
             icon: 'icon-192.png',
             tag: 'arc-rp-' + rt.id,
@@ -3689,14 +3698,14 @@ function checkReminders() {
     const [h, m] = t.reminder.split(':').map(Number);
     if (nowMin >= h * 60 + m) {
       const dueNote = t.reminderDate && t.due && t.reminderDate !== t.due ? ` · Due ${t.due}` : '';
-      new Notification(t.title, { body: pri(t.priority).label + ' · ' + cat(t.category).label + dueNote, tag: 'meridian-' + t.id });
+      showNotif(t.title, { body: pri(t.priority).label + ' · ' + cat(t.category).label + dueNote, icon: 'icon-192.png', tag: 'meridian-' + t.id });
       t.notifiedAt = Date.now();
       save();
     }
   }
 }
-setInterval(checkReminders, 20000);
-checkReminders();
+setInterval(() => { try { checkReminders(); } catch(e) {} }, 20000);
+try { checkReminders(); } catch(e) {}
 
 /* 6:00 AM daily nudge (while the app is open): tap it to hear the brief.
    The Android app will fire this reliably even when closed. */
@@ -3706,11 +3715,11 @@ function morningNudge() {
   if (now.getHours() !== 6) return;
   if (localStorage.getItem('meridian.morningNotif') === todayStr()) return;
   localStorage.setItem('meridian.morningNotif', todayStr());
-  const n = new Notification('Good morning ☀', {
+  showNotif('Good morning ☀', {
     body: 'Here is how your day looks today. Tap to hear your morning brief.',
+    icon: 'icon-192.png',
     tag: 'meridian-morning'
   });
-  n.onclick = () => { window.focus(); n.close(); startBrief(); };
 }
 setInterval(morningNudge, 30000);
 morningNudge();
@@ -4163,8 +4172,8 @@ if ('serviceWorker' in navigator) {
 
 render();
 pullFromSheet();
-scheduleNotifications();
-updateAppBadge();
+try { scheduleNotifications(); } catch(e) {}
+try { updateAppBadge(); } catch(e) {}
 </script>
 </body>
 </html>
