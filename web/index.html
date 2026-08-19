@@ -1114,6 +1114,9 @@ const saveVision = () => { localStorage.setItem('meridian.vision', JSON.stringif
 
 let research = JSON.parse(localStorage.getItem('arc.research') || '[]');
 const saveResearch = () => { localStorage.setItem('arc.research', JSON.stringify(research)); pushToSheet(); scheduleNotifications(); };
+
+let feedbackEntries = JSON.parse(localStorage.getItem('arc.feedback') || '[]');
+const saveFeedback = () => { localStorage.setItem('arc.feedback', JSON.stringify(feedbackEntries)); };
 let expandedProjectId = null;
 let expandedRpTaskId = null;
 let meetingMode = 'work';
@@ -2015,8 +2018,68 @@ function renderStats() {
   document.getElementById('importFile').addEventListener('change', importBackup);
 }
 
+/* ---- Feedback ---- */
+function renderFeedback() {
+  const sorted = [...feedbackEntries].sort((a, b) => b.createdAt - a.createdAt);
+  let html = `<div class="screen-title">Feedback</div>`;
+  if (!sorted.length) {
+    html += `<div style="padding:48px 24px;text-align:center;color:var(--ivory-faint);font-size:15px;line-height:1.6">
+      No feedback yet.<br>Tap <strong style="color:var(--gold)">+</strong> to add your first entry.
+    </div>`;
+  } else {
+    sorted.forEach(fb => {
+      const d = new Date(fb.createdAt);
+      const dateStr = d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+      html += `<div class="panel" style="margin-bottom:12px;position:relative">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div>
+            <div style="font-size:15px;font-weight:600;color:var(--ivory)">${esc(fb.person)}</div>
+            ${fb.role ? `<div style="font-size:12px;color:var(--gold);margin-top:2px">${esc(fb.role)}</div>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:11px;color:var(--ivory-faint)">${dateStr}</span>
+            <button class="rp-delete-btn" data-fbdel="${fb.id}" style="padding:2px 6px">✕</button>
+          </div>
+        </div>
+        <div style="font-size:14px;color:var(--ivory-dim);line-height:1.65;white-space:pre-wrap">${esc(fb.text)}</div>
+      </div>`;
+    });
+  }
+  html += `<div class="footer-space"></div>`;
+  view.innerHTML = html;
+  view.querySelectorAll('[data-fbdel]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      feedbackEntries = feedbackEntries.filter(f => f.id !== btn.dataset.fbdel);
+      saveFeedback(); renderFeedback();
+    });
+  });
+}
+
+async function openFeedbackEditor() {
+  const person = await arcModal({
+    message: 'Who gave you this feedback?',
+    input: true, placeholder: 'Name…',
+    buttons: [{ label: 'Cancel', type: 'secondary', value: null }, { label: 'Next', type: 'primary' }]
+  });
+  if (!person) return;
+  const role = await arcModal({
+    message: `${person}'s role or company (optional)`,
+    input: true, placeholder: 'e.g. Manager at Liana Trust…',
+    buttons: [{ label: 'Skip', type: 'secondary', value: '' }, { label: 'Next', type: 'primary' }]
+  });
+  if (role === null) return;
+  const text = await arcModal({
+    message: 'What was the feedback?',
+    input: true, placeholder: 'Write the feedback here…',
+    buttons: [{ label: 'Cancel', type: 'secondary', value: null }, { label: 'Save', type: 'primary' }]
+  });
+  if (!text) return;
+  feedbackEntries.push({ id: uid(), person, role: role || '', text, createdAt: Date.now() });
+  saveFeedback(); renderFeedback();
+}
+
 function exportBackup() {
-  const data = { app: 'arc', exported: new Date().toISOString(), tasks, vision, prefs, research };
+  const data = { app: 'arc', exported: new Date().toISOString(), tasks, vision, prefs, research, feedbackEntries };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2045,6 +2108,7 @@ function importBackup(e) {
         if (data.vision) { vision = Object.assign({ statement:'', target:'', milestones:[] }, data.vision); saveVision(); }
         if (data.prefs) { Object.assign(prefs, data.prefs); savePrefs(); }
         if (Array.isArray(data.research)) { research = data.research; saveResearch(); }
+        if (Array.isArray(data.feedbackEntries)) { feedbackEntries = data.feedbackEntries; saveFeedback(); }
         save(); render();
       });
     } catch {
@@ -3481,6 +3545,7 @@ view.addEventListener('pointerup', e => {
 
 document.getElementById('fab').addEventListener('click', () => {
   if (screen === 'research') openResearchEditor();
+  else if (screen === 'feedback') openFeedbackEditor();
   else openEditor(null);
 });
 
@@ -3492,6 +3557,7 @@ const NAV = [
   { id: 'vision',   label: 'Vision',   icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>' },
   { id: 'stats',    label: 'Progress', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V13M10 20V4M16 20v-9M21 20H3"/></svg>' },
   { id: 'research', label: 'Research', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg>' },
+  { id: 'feedback', label: 'Feedback', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h8M8 14h5"/></svg>' },
 ];
 const nav = document.getElementById('nav');
 nav.innerHTML = NAV.map(n =>
@@ -3505,6 +3571,9 @@ nav.addEventListener('click', e => {
   render();
 });
 
+// Reduce nav label size when 7+ items fit
+if (NAV.length >= 7) document.querySelectorAll('.nav-item').forEach(el => { el.style.fontSize = '8.5px'; });
+
 function render() {
   try {
     if (screen === 'today') renderToday();
@@ -3512,6 +3581,7 @@ function render() {
     else if (screen === 'calendar') renderCalendar();
     else if (screen === 'vision') renderVision();
     else if (screen === 'research') renderResearch();
+    else if (screen === 'feedback') renderFeedback();
     else renderStats();
   } catch (err) {
     const view = document.getElementById('view');
