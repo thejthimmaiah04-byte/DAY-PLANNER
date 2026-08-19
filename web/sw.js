@@ -1,4 +1,4 @@
-const CACHE = 'arc-v6';
+const CACHE = 'arc-v7';
 const PRECACHE = ['./','./index.html','./manifest.json','./icon.svg',
   './icon-192.png','./icon-512.png',
   './fonts/inter_regular.ttf','./fonts/inter_medium.ttf','./fonts/inter_semibold.ttf',
@@ -15,10 +15,7 @@ self.addEventListener('activate', e => {
       .then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
       .then(() => clients.matchAll({ type: 'window', includeUncontrolled: true }))
-      .then(all => all.forEach(c => {
-        // navigate() forces a reload even on old pages without the SW_UPDATED listener
-        c.navigate(c.url).catch(() => c.postMessage({ type: 'SW_UPDATED' }));
-      }))
+      .then(all => all.forEach(c => c.postMessage({ type: 'SW_UPDATED' })))
   );
 });
 

@@ -4021,12 +4021,15 @@ if ('serviceWorker' in navigator) {
       const sw = reg.installing;
       if (!sw) return;
       sw.addEventListener('statechange', () => {
-        if (sw.state === 'activated') location.reload();
+        // Show update banner instead of forcing reload — avoids blank screen on SW activation
+        if (sw.state === 'activated') {
+          document.getElementById('updateBanner').classList.add('show');
+        }
       });
     });
   }).catch(()=>{});
   navigator.serviceWorker.addEventListener('message', e => {
-    if (e.data?.type === 'SW_UPDATED') location.reload();
+    if (e.data?.type === 'SW_UPDATED') document.getElementById('updateBanner').classList.add('show');
   });
 }
 
