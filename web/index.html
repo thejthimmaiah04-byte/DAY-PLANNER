@@ -873,7 +873,7 @@
     <button class="qs-btn danger" data-qs="drop">✕ Drop task</button>
   </div>
 
-  <main id="view"></main>
+  <main id="view"><div style="padding:48px 24px;text-align:center;color:var(--ivory-faint);font-size:15px">Loading…</div></main>
 
   <button id="fab" title="Add task">+</button>
 
@@ -996,12 +996,31 @@ const REPEATS = [
 const cat = id => CATEGORIES.find(c => c.id === id) || CATEGORIES[0];
 const pri = id => PRIORITIES.find(p => p.id === id) || PRIORITIES[2];
 
-let tasks = JSON.parse(localStorage.getItem('meridian.tasks') || '[]');
+// Safe localStorage JSON reader — corrupt data returns the fallback instead of crashing the app
+function safeJSON(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch(e) { console.warn('safeJSON failed for', key, e); localStorage.removeItem(key); return fallback; }
+}
+
+// Global error handler — catches crashes before render() and shows a message instead of blank screen
+window.onerror = (msg, src, line, col, err) => {
+  const view = document.getElementById('view');
+  if (view && !view.dataset.hasContent) {
+    view.innerHTML = `<div style="padding:20px 16px">
+      <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:10px">Something went wrong on startup</div>
+      <pre style="font-size:11px;color:var(--ivory-faint);white-space:pre-wrap;word-break:break-all">${String(err?.stack||msg)}</pre>
+      <button onclick="localStorage.clear();location.reload()" style="margin-top:12px;padding:8px 16px;background:var(--terracotta);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer">Clear data &amp; restart</button>
+      <button onclick="location.reload(true)" style="margin-top:8px;margin-left:8px;padding:8px 16px;background:var(--gold);color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer">Reload</button>
+    </div>`;
+  }
+};
+
+let tasks = safeJSON('meridian.tasks', []);
 
 // Prune completed repeating tasks older than 90 days into arc.archive to cap storage growth
 function pruneOldCompletedRepeats() {
   const cutoff = toDateStr(new Date(Date.now() - 90 * 86400000));
-  const archive = JSON.parse(localStorage.getItem('arc.archive') || '[]');
+  const archive = safeJSON('arc.archive', []);
   const pruned = tasks.filter(t => t.done && t.repeat && t.due && t.due < cutoff);
   if (!pruned.length) return;
   tasks = tasks.filter(t => !(t.done && t.repeat && t.due && t.due < cutoff));
@@ -1035,7 +1054,7 @@ function pushToSheet() {
     research,
     meta: {
       prefs: typeof prefs !== 'undefined' ? prefs : {},
-      archive: JSON.parse(localStorage.getItem('arc.archive') || '[]'),
+      archive: safeJSON('arc.archive', []),
       syncedAt: new Date().toISOString()
     }
   });
@@ -1108,14 +1127,13 @@ async function pullFromSheet() {
 
 const save = () => { localStorage.setItem('meridian.tasks', JSON.stringify(tasks)); pushToSheet(); scheduleNotifications(); updateAppBadge(); };
 
-let vision = Object.assign({ statement: '', target: '', milestones: [] },
-  JSON.parse(localStorage.getItem('meridian.vision') || '{}'));
+let vision = Object.assign({ statement: '', target: '', milestones: [] }, safeJSON('meridian.vision', {}));
 const saveVision = () => { localStorage.setItem('meridian.vision', JSON.stringify(vision)); pushToSheet(); };
 
-let research = JSON.parse(localStorage.getItem('arc.research') || '[]');
+let research = safeJSON('arc.research', []);
 const saveResearch = () => { localStorage.setItem('arc.research', JSON.stringify(research)); pushToSheet(); scheduleNotifications(); };
 
-let feedbackEntries = JSON.parse(localStorage.getItem('arc.feedback') || '[]');
+let feedbackEntries = safeJSON('arc.feedback', []);
 const saveFeedback = () => { localStorage.setItem('arc.feedback', JSON.stringify(feedbackEntries)); };
 let expandedProjectId = null;
 let expandedRpTaskId = null;
@@ -1617,7 +1635,9 @@ function renderToday() {
   // Active research tasks: date range covers today, due today, or no date set (always show undated)
   const today2 = todayStr();
   const activeResearch = [];
+  try {
   research.forEach(proj => {
+    if (!Array.isArray(proj.tasks)) return;
     proj.tasks.forEach(rt => {
       if (rt.done) return;
       const inRange = rt.startDate && rt.due && rt.startDate <= today2 && rt.due >= today2;
@@ -1626,6 +1646,7 @@ function renderToday() {
       if (inRange || dueToday || undated) activeResearch.push({ proj, task: rt });
     });
   });
+  } catch(e) { console.error('research section crashed', e); }
   if (activeResearch.length) {
     html += `<div class="section-label">Research · Active Today</div>`;
     // Build week day strings for streak dots (Mon-Sun of current week)
@@ -2515,7 +2536,7 @@ overlay.addEventListener('click', closeEditor);
 
 /* ================= Morning brief ================= */
 const prefs = Object.assign({ weather: true, news: true, voiceName: '', rate: 0.95 },
-  JSON.parse(localStorage.getItem('meridian.prefs') || '{}'));
+  safeJSON('meridian.prefs', {}));
 const savePrefs = () => { localStorage.setItem('meridian.prefs', JSON.stringify(prefs)); pushToSheet(); };
 
 const briefEl = document.getElementById('brief');
@@ -3638,13 +3659,19 @@ function render() {
     else if (screen === 'research') renderResearch();
     else if (screen === 'feedback') renderFeedback();
     else renderStats();
+    // Mark view as successfully rendered so global onerror won't overwrite it
+    const v = document.getElementById('view');
+    if (v) v.dataset.hasContent = '1';
   } catch (err) {
-    const view = document.getElementById('view');
-    if (view) view.innerHTML = `<div style="padding:20px 16px">
-      <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px">Render error — please report this</div>
-      <pre style="font-size:11px;color:var(--ivory-faint);white-space:pre-wrap;word-break:break-all">${esc(String(err?.stack || err))}</pre>
-      <button onclick="render()" style="margin-top:12px;padding:8px 16px;background:var(--gold);color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer">Retry</button>
-    </div>`;
+    const v = document.getElementById('view');
+    if (v) {
+      v.dataset.hasContent = '1';
+      v.innerHTML = `<div style="padding:20px 16px">
+        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px">Render error — please report this</div>
+        <pre style="font-size:11px;color:var(--ivory-faint);white-space:pre-wrap;word-break:break-all">${esc(String(err?.stack || err))}</pre>
+        <button onclick="render()" style="margin-top:12px;padding:8px 16px;background:var(--gold);color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer">Retry</button>
+      </div>`;
+    }
     console.error('render() crashed:', err);
   }
 }
@@ -3715,7 +3742,7 @@ eveningNudge();
 /* ================= Calendar Sync ================= */
 let calFetchedEvents = [];
 let calDays = 7;
-const calImported = new Set(JSON.parse(localStorage.getItem('arc.calImported') || '[]'));
+const calImported = new Set(safeJSON('arc.calImported', []));
 
 const calOverlay  = document.getElementById('calOverlay');
 const calSheet    = document.getElementById('calSheet');
